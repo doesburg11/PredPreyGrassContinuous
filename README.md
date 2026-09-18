@@ -30,6 +30,21 @@ not an extension of the reproduction research itself.
     (`predator_0`, `prey_0`, `prey_1`, ...).
   - `--mode ps`: parameter sharing, one shared policy per species
     (`predator_policy`, `prey_policy`).
+  - `--checkpoint-dir <dir>` saves an RLlib checkpoint after training, for use
+    with `eval.py`.
+- `eval.py` — rolls out either a checkpoint from `train.py --checkpoint-dir`
+  (greedily: argmax over each policy's action logits, no exploration) or, with
+  `--random`, a uniform-random baseline with no RLlib/checkpoint involved at
+  all -- visualized either way with Aquarium's own `pygame` renderer:
+  - `--render window` (default) opens a live pygame window.
+  - `--render video` does the same and also saves an mp4 per episode (via
+    `imageio`/ffmpeg) to `--out-dir`.
+  - `--render none` skips rendering for a fast, display-free numeric eval.
+  - `--draw-view-cones`, `--draw-force-vectors`, `--draw-hit-boxes`,
+    `--draw-death-circles` toggle Aquarium's debug overlays.
+  - On a headless box, run with `SDL_VIDEODRIVER=dummy` to render off-screen
+    (still works with `--render video`; pygame needs a real display surface
+    even though nothing is shown).
 
 ## Install
 
@@ -61,6 +76,15 @@ for a smoke test.)
 ```bash
 python train.py --mode ps --predator-count 1 --prey-count 4 --iterations 5
 python train.py --mode il --predator-count 1 --prey-count 4 --iterations 5
+
+# Train with a checkpoint, then watch/record the trained agents:
+python train.py --mode ps --predator-count 1 --prey-count 4 --iterations 20 \
+    --checkpoint-dir /tmp/aquarium-ckpt
+python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 3
+python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 1 --render video
+
+# Or watch a uniform-random baseline, no checkpoint needed:
+python eval.py --random --predator-count 1 --prey-count 4 --episodes 3
 ```
 
 Both modes were smoke-tested end to end (real `PPOConfig().build_algo()` +

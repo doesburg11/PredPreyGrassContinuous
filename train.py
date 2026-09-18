@@ -67,6 +67,13 @@ def main():
     parser.add_argument("--max-time-steps", type=_positive_int, default=200)
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
+    parser.add_argument(
+        "--checkpoint-dir",
+        default=None,
+        help="Save an RLlib checkpoint here after training (load it with "
+        "`eval.py --checkpoint <dir>` to visualize the trained agents). If "
+        "omitted, no checkpoint is saved.",
+    )
     args = parser.parse_args()
     if args.num_env_runners < 0:
         parser.error("--num-env-runners must be >= 0")
@@ -108,6 +115,9 @@ def main():
                 f"episode_return_mean={reward_mean}  "
                 f"num_episodes={num_episodes}"
             )
+        if args.checkpoint_dir:
+            result = algo.save(args.checkpoint_dir)
+            print(f"checkpoint saved to {result.checkpoint.path}")
     finally:
         algo.stop()
 
