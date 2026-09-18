@@ -1,0 +1,18 @@
+# Install order matters -- see README.md "Install" section for why.
+#
+# Step 1:
+#   pip install "ray[rllib]==2.58.0" torch --extra-index-url https://download.pytorch.org/whl/cpu
+# Step 2 (marl-aquarium's own pins are stale -- see README):
+#   pip install --no-deps marl-aquarium==0.1.10
+#   pip install --no-deps moviepy==1.0.3
+#
+# Resolved, working versions in this venv (everything except moviepy came from
+# step 1's resolver, not from marl-aquarium's setup.py pins):
+ray[rllib]==2.58.0
+torch==2.14.0
+gymnasium==1.2.2
+pettingzoo==1.24.2
+marl-aquarium==0.1.10
+moviepy==1.0.3
+numpy==2.4.6
+pygame==2.6.1
