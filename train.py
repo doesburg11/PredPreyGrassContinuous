@@ -13,7 +13,11 @@ Usage:
 """
 
 import argparse
+import math
 import time
+
+import numpy as np
+from tensorboardX import SummaryWriter
 
 from env_wrapper import ENV_NAME, register
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -31,6 +35,18 @@ def _species_of(agent_id: str) -> str:
         f"Unrecognized agent id {agent_id!r}: expected 'predator_<i>' or "
         "'prey_<j>'. Aquarium's own agent-naming scheme may have changed."
     )
+
+
+def _flatten_scalars(prefix: str, value, out: dict) -> None:
+    """Collect every finite number in a nested RLlib result dict as 'a/b/c'."""
+    if isinstance(value, dict):
+        for key, sub in value.items():
+            _flatten_scalars(f"{prefix}/{key}" if prefix else str(key), sub, out)
+    elif isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(
+        value, bool
+    ):
+        if math.isfinite(value):
+            out[prefix] = float(value)
 
 
 def build_policies(mode: str, predator_count: int, prey_count: int):
@@ -78,6 +94,13 @@ def main():
         help="Remote learner actors (0 = learn inside the driver process).",
     )
     parser.add_argument(
+        "--tensorboard-dir",
+        default=None,
+        help="Write every numeric metric RLlib reports each iteration here as "
+        "TensorBoard scalars (view with `tensorboard --logdir <dir>`). If "
+        "omitted, nothing is written.",
+    )
+    parser.add_argument(
         "--checkpoint-dir",
         default=None,
         help="Save an RLlib checkpoint here after training (load it with "
@@ -120,6 +143,7 @@ def main():
     )
 
     algo = config.build_algo()
+    writer = SummaryWriter(args.tensorboard_dir) if args.tensorboard_dir else None
     try:
         for i in range(args.iterations):
             t0 = time.time()
@@ -131,6 +155,12 @@ def main():
                 k: round(v, 1)
                 for k, v in env_runner_stats.get("module_episode_returns_mean", {}).items()
             }
+            if writer is not None:
+                scalars = {}
+                _flatten_scalars("", result, scalars)
+                for tag, scalar in scalars.items():
+                    writer.add_scalar(tag, scalar, i + 1)
+                writer.flush()
             print(
                 f"iter {i + 1}/{args.iterations}  "
                 f"episode_return_mean={reward_mean}  "
@@ -142,6 +172,8 @@ def main():
             result = algo.save(args.checkpoint_dir)
             print(f"checkpoint saved to {result.checkpoint.path}")
     finally:
+        if writer is not None:
+            writer.close()
         algo.stop()
 
 
