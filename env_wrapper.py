@@ -17,9 +17,57 @@ from ray.tune.registry import register_env
 ENV_NAME = "aquarium"
 
 
+def _patch_predator_catch_rewards(raw_env) -> None:
+    """Give predators the reward Aquarium meant to pay for a catch.
+
+    With keep_prey_count_constant=True (the default), raw_env.update_prey
+    respawns a caught prey (recently_died=True, alive stays True) instead of
+    killing it, and raw_env.step only records a catch event when
+    `not prey.alive`. So `catches` is always empty and get_predator_rewards
+    always returns 0 -- predators get no learning signal (Aquarium even has
+    a "TODO: Sharks now get no reward for eating fish" at that spot).
+
+    Patches this one env instance: update_prey records the prey's position
+    at the moment of collision (before the respawn teleports it), and
+    get_rewards feeds those events to Aquarium's own predator-reward logic
+    (predator_reward split among predators within catch_radius). Prey
+    rewards and punishment are untouched.
+    """
+    needed = ("update_prey", "get_rewards", "keep_prey_count_constant")
+    missing = [name for name in needed if not hasattr(raw_env, name)]
+    if missing:
+        raise RuntimeError(
+            f"marl_aquarium internals changed (missing {missing}); "
+            "_patch_predator_catch_rewards needs updating"
+        )
+    if not raw_env.keep_prey_count_constant:
+        return  # prey really die, so Aquarium's own catch events work
+    if hasattr(raw_env, "_pending_catches"):
+        return  # already patched; wrapping twice would double the reward
+    pending = raw_env._pending_catches = []
+    original_update_prey = raw_env.update_prey
+    original_get_rewards = raw_env.get_rewards
+
+    def update_prey(prey, predators, desired_velocity):
+        position = prey.position.copy()
+        result = original_update_prey(prey, predators, desired_velocity)
+        if prey.recently_died:
+            pending.append({"killed": prey.id(), "position": position})
+        return result
+
+    def get_rewards(catches):
+        all_catches = list(catches) + pending
+        pending.clear()
+        return original_get_rewards(all_catches)
+
+    raw_env.update_prey = update_prey
+    raw_env.get_rewards = get_rewards
+
+
 class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
-    """ParallelPettingZooEnv with two Aquarium-specific fixes (see Codex
-    review, 2026-09-18):
+    """ParallelPettingZooEnv with Aquarium-specific fixes (see Codex
+    review, 2026-09-18). Besides the two below, __init__ applies
+    _patch_predator_catch_rewards.
 
     1. Aquarium's own close() unconditionally calls sys.exit()
        (marl_aquarium/env/aquarium.py:320, apparently meant for a pygame
@@ -35,7 +83,13 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
        stream. Fixing that properly requires an upstream Aquarium change.
     """
 
+    def __init__(self, env):
+        super().__init__(env)
+        _patch_predator_catch_rewards(env.aec_env.unwrapped)
+
     def reset(self, *, seed=None, options=None):
+        # Drop catch events left over from a step that raised mid-way.
+        getattr(self.par_env.aec_env.unwrapped, "_pending_catches", []).clear()
         if seed is not None:
             random.seed(seed)
         return super().reset(seed=seed, options=options)
