@@ -83,8 +83,9 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
        stream. Fixing that properly requires an upstream Aquarium change.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, reward_scale: float = 1.0):
         super().__init__(env)
+        self.reward_scale = reward_scale
         _patch_predator_catch_rewards(env.aec_env.unwrapped)
 
     def reset(self, *, seed=None, options=None):
@@ -93,6 +94,12 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         if seed is not None:
             random.seed(seed)
         return super().reset(seed=seed, options=options)
+
+    def step(self, action_dict):
+        obs, rewards, terminateds, truncateds, infos = super().step(action_dict)
+        if self.reward_scale != 1.0:
+            rewards = {agent: r * self.reward_scale for agent, r in rewards.items()}
+        return obs, rewards, terminateds, truncateds, infos
 
     def close(self):
         try:
@@ -103,13 +110,16 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
 
 def make_env(env_config: dict) -> ParallelPettingZooEnv:
     """env_config keys are passed straight through to
-    aquarium_v0.parallel_env(), except `procreate` which is rejected: with
+    aquarium_v0.parallel_env(), except `reward_scale` (multiplies every reward,
+    default 1.0; PPO's value-loss clipping copes badly with Aquarium's -1000
+    prey punishment) and `procreate` which is rejected: with
     it enabled, Aquarium creates prey IDs absent from the initial
     possible_agents/observation-space snapshot that ParallelPettingZooEnv
     takes at construction time, and train.py's IL mode has no policy for an
     agent ID it can't enumerate ahead of time. Not supported here.
     """
     env_config = dict(env_config or {})
+    reward_scale = env_config.pop("reward_scale", 1.0)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
         raise ValueError(
@@ -118,7 +128,9 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
             "possible_agents/space snapshot, and train.py's IL mode has no "
             "policy for an agent ID it can't enumerate ahead of time."
         )
-    return SafeParallelPettingZooEnv(aquarium_v0.parallel_env(**env_config))
+    return SafeParallelPettingZooEnv(
+        aquarium_v0.parallel_env(**env_config), reward_scale=reward_scale
+    )
 
 
 def register() -> None:

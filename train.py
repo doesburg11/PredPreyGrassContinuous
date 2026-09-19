@@ -84,6 +84,14 @@ def main():
     parser.add_argument("--max-time-steps", type=_positive_int, default=200)
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
+    parser.add_argument(
+        "--reward-scale",
+        type=float,
+        default=1.0,
+        help="Multiply every reward by this during training (e.g. 0.01 so the "
+        "-1000 prey punishment fits PPO's value-loss clipping). eval.py always "
+        "reports unscaled rewards.",
+    )
     parser.add_argument("--train-batch-size", type=_positive_int, default=4000)
     parser.add_argument("--minibatch-size", type=_positive_int, default=128)
     parser.add_argument("--num-epochs", type=_positive_int, default=30)
@@ -124,6 +132,7 @@ def main():
                 "prey_count": args.prey_count,
                 "max_time_steps": args.max_time_steps,
                 "render_mode": None,
+                "reward_scale": args.reward_scale,
             },
         )
         .env_runners(num_env_runners=args.num_env_runners)

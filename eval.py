@@ -141,6 +141,7 @@ def main():
         env_config = dict(algo.config.env_config)
 
     env_config.update(
+        reward_scale=1.0,  # report raw Aquarium rewards even for a scaled-reward checkpoint
         render_mode=None if args.render == "none" else "rgb_array",
         draw_view_cones=args.draw_view_cones,
         draw_force_vectors=args.draw_force_vectors,
