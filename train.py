@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import time
 
 from env_wrapper import ENV_NAME, register
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -67,6 +68,15 @@ def main():
     parser.add_argument("--max-time-steps", type=_positive_int, default=200)
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
+    parser.add_argument("--train-batch-size", type=_positive_int, default=4000)
+    parser.add_argument("--minibatch-size", type=_positive_int, default=128)
+    parser.add_argument("--num-epochs", type=_positive_int, default=30)
+    parser.add_argument(
+        "--num-learners",
+        type=int,
+        default=0,
+        help="Remote learner actors (0 = learn inside the driver process).",
+    )
     parser.add_argument(
         "--checkpoint-dir",
         default=None,
@@ -94,6 +104,12 @@ def main():
             },
         )
         .env_runners(num_env_runners=args.num_env_runners)
+        .training(
+            train_batch_size_per_learner=args.train_batch_size,
+            minibatch_size=args.minibatch_size,
+            num_epochs=args.num_epochs,
+        )
+        .learners(num_learners=args.num_learners)
         .multi_agent(policies=policies, policy_mapping_fn=mapping_fn)
         .rl_module(
             rl_module_spec=MultiRLModuleSpec(
@@ -106,14 +122,21 @@ def main():
     algo = config.build_algo()
     try:
         for i in range(args.iterations):
+            t0 = time.time()
             result = algo.train()
             env_runner_stats = result.get("env_runners", {})
             reward_mean = env_runner_stats.get("episode_return_mean")
             num_episodes = env_runner_stats.get("num_episodes")
+            module_returns = {
+                k: round(v, 1)
+                for k, v in env_runner_stats.get("module_episode_returns_mean", {}).items()
+            }
             print(
                 f"iter {i + 1}/{args.iterations}  "
                 f"episode_return_mean={reward_mean}  "
-                f"num_episodes={num_episodes}"
+                f"num_episodes={num_episodes}  "
+                f"module_returns={module_returns}  "
+                f"{time.time() - t0:.1f}s"
             )
         if args.checkpoint_dir:
             result = algo.save(args.checkpoint_dir)

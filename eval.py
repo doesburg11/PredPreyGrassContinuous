@@ -149,11 +149,14 @@ def main():
     )
     env = make_env(env_config)
 
+    summary = []  # (predator_return, prey_return, prey_eaten) per episode
     try:
         for episode in range(1, args.episodes + 1):
             obs, _ = env.reset()
             frames = []
             episode_return = 0.0
+            species_return = {"predator": 0.0, "prey": 0.0}
+            prey_eaten = 0
             steps = 0
             done = False
             while not done:
@@ -163,6 +166,13 @@ def main():
                     actions = select_actions(algo, obs, mapping_fn)
                 obs, rewards, terminateds, truncateds, _ = env.step(actions)
                 episode_return += sum(rewards.values())
+                for agent_id, reward in rewards.items():
+                    species = "predator" if agent_id.startswith("predator") else "prey"
+                    species_return[species] += reward
+                    # Aquarium's default prey_punishment (1000) dwarfs every
+                    # other per-step reward, so this only fires on a catch.
+                    if species == "prey" and reward <= -500:
+                        prey_eaten += 1
                 steps += 1
                 if args.render != "none":
                     # par_env is PettingZoo's aec_to_parallel_wrapper, whose
@@ -179,10 +189,23 @@ def main():
                 done = terminateds["__all__"] or truncateds["__all__"]
             print(
                 f"episode {episode}/{args.episodes}  "
-                f"return={episode_return:.1f}  steps={steps}"
+                f"return={episode_return:.1f}  "
+                f"predator_return={species_return['predator']:.1f}  "
+                f"prey_return={species_return['prey']:.1f}  "
+                f"prey_eaten={prey_eaten}  steps={steps}"
+            )
+            summary.append(
+                (species_return["predator"], species_return["prey"], prey_eaten)
             )
             if args.render == "video" and frames:
                 save_video(frames, args.out_dir, episode)
+        n = len(summary)
+        if n:
+            pred, prey, eaten = (sum(col) / n for col in zip(*summary))
+            print(
+                f"mean over {n} episodes: predator_return={pred:.1f}  "
+                f"prey_return={prey:.1f}  prey_eaten={eaten:.2f}"
+            )
     finally:
         env.close()
         if algo is not None:
