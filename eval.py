@@ -28,11 +28,12 @@ display-free numeric eval.
 import argparse
 from pathlib import Path
 
-from env_wrapper import make_env, register
 import numpy as np
+import torch
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.core.columns import Columns
-import torch
+
+from env_wrapper import make_env, register
 
 
 @torch.inference_mode()
@@ -135,7 +136,8 @@ def main():
         "--predator-fov",
         type=_fov_degrees,
         default=None,
-        help="Same as --prey-fov but for predators (Aquarium's default is 150).",
+        help="Same as --prey-fov but for predators (Aquarium's default is "
+        "150).",
     )
     parser.add_argument("--episodes", type=_positive_int, default=1)
     parser.add_argument(
@@ -166,7 +168,8 @@ def main():
         env_config = dict(algo.config.env_config)
 
     env_config.update(
-        reward_scale=1.0,  # report raw Aquarium rewards even for a scaled-reward checkpoint
+        # report raw Aquarium rewards even for a scaled-reward checkpoint
+        reward_scale=1.0,
         render_mode=None if args.render == "none" else "rgb_array",
         draw_view_cones=args.draw_view_cones,
         draw_force_vectors=args.draw_force_vectors,
@@ -197,7 +200,8 @@ def main():
                 obs, rewards, terminateds, truncateds, _ = env.step(actions)
                 episode_return += sum(rewards.values())
                 for agent_id, reward in rewards.items():
-                    species = "predator" if agent_id.startswith("predator") else "prey"
+                    is_predator = agent_id.startswith("predator")
+                    species = "predator" if is_predator else "prey"
                     species_return[species] += reward
                     # Aquarium's default prey_punishment (1000) dwarfs every
                     # other per-step reward, so this only fires on a catch.
@@ -225,7 +229,11 @@ def main():
                 f"prey_eaten={prey_eaten}  steps={steps}"
             )
             summary.append(
-                (species_return["predator"], species_return["prey"], prey_eaten)
+                (
+                    species_return["predator"],
+                    species_return["prey"],
+                    prey_eaten,
+                )
             )
             if args.render == "video" and frames:
                 save_video(frames, args.out_dir, episode)
