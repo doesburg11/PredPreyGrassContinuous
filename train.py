@@ -76,6 +76,24 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _non_negative_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError(
+            f"must be a finite number >= 0, got {parsed}"
+        )
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError(
+            f"must be a finite positive number, got {parsed}"
+        )
+    return parsed
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["il", "ps"], default="ps")
@@ -92,9 +110,33 @@ def main():
         "-1000 prey punishment fits PPO's value-loss clipping). eval.py always "
         "reports unscaled rewards.",
     )
+    parser.add_argument(
+        "--entropy-coeff",
+        type=_non_negative_float,
+        default=0.0,
+        help="Weight of the entropy bonus in PPO's loss (RLlib's default is "
+        "0.0, i.e. no pressure against a policy collapsing to a near-constant "
+        "action -- see runs/ps_1000's prey_policy). Try e.g. 0.01.",
+    )
     parser.add_argument("--train-batch-size", type=_positive_int, default=4000)
     parser.add_argument("--minibatch-size", type=_positive_int, default=128)
     parser.add_argument("--num-epochs", type=_positive_int, default=30)
+    parser.add_argument(
+        "--vf-share-layers",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Share the encoder trunk between the policy and value function "
+        "(RLlib's default). If the critic isn't learning (vf_explained_var "
+        "stuck near 0), --no-vf-share-layers stops it from also corrupting "
+        "the actor's features.",
+    )
+    parser.add_argument(
+        "--grad-clip",
+        type=_positive_float,
+        default=None,
+        help="Clip the global gradient norm to this value each update "
+        "(RLlib's default is no clipping).",
+    )
     parser.add_argument(
         "--num-learners",
         type=int,
@@ -140,6 +182,9 @@ def main():
             train_batch_size_per_learner=args.train_batch_size,
             minibatch_size=args.minibatch_size,
             num_epochs=args.num_epochs,
+            entropy_coeff=args.entropy_coeff,
+            grad_clip=args.grad_clip,
+            grad_clip_by="global_norm",
         )
         .learners(num_learners=args.num_learners)
         .multi_agent(policies=policies, policy_mapping_fn=mapping_fn)
@@ -147,7 +192,7 @@ def main():
             rl_module_spec=MultiRLModuleSpec(
                 rl_module_specs={p: RLModuleSpec() for p in policies},
             ),
-            model_config=DefaultModelConfig(vf_share_layers=True),
+            model_config=DefaultModelConfig(vf_share_layers=args.vf_share_layers),
         )
     )
 
