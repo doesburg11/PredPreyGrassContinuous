@@ -94,12 +94,34 @@ def _positive_float(value: str) -> float:
     return parsed
 
 
+def _fov_degrees(value: str) -> int:
+    parsed = int(value)
+    if not 0 < parsed <= 360:
+        raise argparse.ArgumentTypeError(
+            f"must be a field of view in (0, 360] degrees, got {parsed}"
+        )
+    return parsed
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["il", "ps"], default="ps")
     parser.add_argument("--predator-count", type=_positive_int, default=1)
     parser.add_argument("--prey-count", type=_positive_int, default=4)
     parser.add_argument("--max-time-steps", type=_positive_int, default=200)
+    parser.add_argument(
+        "--prey-fov",
+        type=_fov_degrees,
+        default=None,
+        help="Prey field of view in degrees (Aquarium's default is 120). "
+        "Omit to keep Aquarium's default.",
+    )
+    parser.add_argument(
+        "--predator-fov",
+        type=_fov_degrees,
+        default=None,
+        help="Predator field of view in degrees (Aquarium's default is 150).",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
     parser.add_argument(
@@ -165,17 +187,23 @@ def main():
 
     policies, mapping_fn = build_policies(args.mode, args.predator_count, args.prey_count)
 
+    env_config = {
+        "predator_count": args.predator_count,
+        "prey_count": args.prey_count,
+        "max_time_steps": args.max_time_steps,
+        "render_mode": None,
+        "reward_scale": args.reward_scale,
+    }
+    if args.prey_fov is not None:
+        env_config["prey_fov"] = args.prey_fov
+    if args.predator_fov is not None:
+        env_config["predator_fov"] = args.predator_fov
+
     config = (
         PPOConfig()
         .environment(
             ENV_NAME,
-            env_config={
-                "predator_count": args.predator_count,
-                "prey_count": args.prey_count,
-                "max_time_steps": args.max_time_steps,
-                "render_mode": None,
-                "reward_scale": args.reward_scale,
-            },
+            env_config=env_config,
         )
         .env_runners(num_env_runners=args.num_env_runners)
         .training(

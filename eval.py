@@ -64,6 +64,15 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _fov_degrees(value: str) -> int:
+    parsed = int(value)
+    if not 0 < parsed <= 360:
+        raise argparse.ArgumentTypeError(
+            f"must be a field of view in (0, 360] degrees, got {parsed}"
+        )
+    return parsed
+
+
 def save_video(
     frames: list, out_dir: str, episode: int, fps: int = 60
 ) -> None:
@@ -112,6 +121,22 @@ def main():
         default=200,
         help="Only used with --random",
     )
+    parser.add_argument(
+        "--prey-fov",
+        type=_fov_degrees,
+        default=None,
+        help="Override the prey field of view in degrees (Aquarium's default "
+        "is 120; a --checkpoint policy was trained at whatever value it was "
+        "trained with, so widening it here feeds that policy information it "
+        "never learned to use -- a real behavior change, not just a wider "
+        "drawn cone). Omit to keep the checkpoint's/default value.",
+    )
+    parser.add_argument(
+        "--predator-fov",
+        type=_fov_degrees,
+        default=None,
+        help="Same as --prey-fov but for predators (Aquarium's default is 150).",
+    )
     parser.add_argument("--episodes", type=_positive_int, default=1)
     parser.add_argument(
         "--render", choices=["window", "video", "none"], default="window"
@@ -148,6 +173,10 @@ def main():
         draw_hit_boxes=args.draw_hit_boxes,
         draw_death_circles=args.draw_death_circles,
     )
+    if args.prey_fov is not None:
+        env_config["prey_fov"] = args.prey_fov
+    if args.predator_fov is not None:
+        env_config["predator_fov"] = args.predator_fov
     env = make_env(env_config)
 
     summary = []  # (predator_return, prey_return, prey_eaten) per episode
