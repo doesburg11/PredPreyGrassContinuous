@@ -8,6 +8,7 @@ wrapper is sufficient. This module just registers it with Ray Tune's env
 registry under a fixed name so RLlib configs can reference it by string.
 """
 
+import math
 import random
 
 from marl_aquarium import aquarium_v0
@@ -127,11 +128,129 @@ def _patch_prey_death(raw_env) -> None:
     raw_env.get_rewards = get_rewards
 
 
+def _patch_torus_view(raw_env) -> None:
+    """Fix Aquarium's view-cone check across torus edges.
+
+    Torus.check_if_entity_is_in_view_in_torus (marl_aquarium/env/utils.py)
+    is what both species use to decide whom they see. Two bugs:
+
+    1. It tests the observer's cone shifted by each of the 8 torus offsets,
+       but assigns is_in_view on every loop pass instead of OR-ing, so only
+       the last offset (-width, -height) counts: an animal just across the
+       left, right, top or bottom edge is never seen.
+    2. The angle test is abs(angle_to_animal - heading) with both in
+       [0, 360), without wrapping, so a cone straddling 0/360 degrees is
+       cut off on one side.
+
+    Replace it on this env's torus with the nearest-image offset (the
+    wrapped dx, dy) and a wrapped angular difference. Uses Aquarium's own
+    angle convention (-atan2(dy, dx) in degrees, as for orientation_angle).
+    Only the nearest image is tested, which equals testing all 9 images as
+    long as view_distance <= min(width, height) / 2 (100/200 vs 800 by
+    default).
+    """
+    torus = getattr(raw_env, "torus", None)
+    if torus is None or not all(
+        hasattr(torus, name)
+        for name in ("width", "height", "check_if_entity_is_in_view_in_torus")
+    ):
+        raise RuntimeError(
+            "marl_aquarium internals changed (Torus); "
+            "_patch_torus_view needs updating"
+        )
+    if getattr(torus, "_view_patched", False):
+        return
+    torus._view_patched = True
+
+    def check_if_entity_is_in_view_in_torus(observer, animal, view_distance, fov):
+        dx = animal.position.x - observer.position.x
+        dy = animal.position.y - observer.position.y
+        dx = (dx + torus.width / 2) % torus.width - torus.width / 2
+        dy = (dy + torus.height / 2) % torus.height - torus.height / 2
+        if math.hypot(dx, dy) > view_distance:
+            return False
+        angle = -math.degrees(math.atan2(dy, dx))
+        diff = abs((angle - observer.orientation_angle + 180) % 360 - 180)
+        return diff <= fov / 2
+
+    torus.check_if_entity_is_in_view_in_torus = check_if_entity_is_in_view_in_torus
+
+
+def _patch_predator_vision(raw_env) -> None:
+    """Let predators see prey with their own view cone.
+
+    1. Aquarium's predator_nearby_fish_observations checks visibility with
+       prey_view_distance/prey_fov (100, 120 deg) instead of the predator's
+       own predator_view_distance/predator_fov (200, 150 deg), so the
+       predator_fov option had no effect on what predators observe (only on
+       the rendered view cone), and predators almost never saw a prey.
+    2. It also appends every prey in view without a cap, so more than
+       prey_observe_count prey in view overflows the observation and trips
+       the length assert in get_predator_observations. Keep the
+       prey_observe_count nearest (by torus distance) instead.
+
+    Only the fov_enabled path (the default, and all train.py uses) is
+    replaced. The fov_enabled=False path is left as-is and is broken
+    upstream: it takes the n nearest prey regardless of distance, and
+    nearby_animal_observation's scale() asserts on any prey farther than
+    the predator's view distance.
+
+    Visibility goes through Torus.check_if_entity_is_in_view_in_torus,
+    which _patch_torus_view fixes.
+    """
+    needed = (
+        "predator_nearby_fish_observations",
+        "nearby_animal_observation",
+        "torus",
+        "prey",
+        "fov_enabled",
+        "predator_view_distance",
+        "predator_fov",
+        "prey_observe_count",
+        "obs_size",
+    )
+    missing = [name for name in needed if not hasattr(raw_env, name)]
+    if missing:
+        raise RuntimeError(
+            f"marl_aquarium internals changed (missing {missing}); "
+            "_patch_predator_vision needs updating"
+        )
+    if not raw_env.fov_enabled:
+        return
+    if getattr(raw_env, "_predator_vision_patched", False):
+        return
+    raw_env._predator_vision_patched = True
+    torus = raw_env.torus
+
+    def predator_nearby_fish_observations(observer):
+        in_view = [
+            fish
+            for fish in raw_env.prey
+            if torus.check_if_entity_is_in_view_in_torus(
+                observer, fish, raw_env.predator_view_distance, raw_env.predator_fov
+            )
+        ]
+        in_view.sort(
+            key=lambda fish: torus.get_distance_in_torus(
+                observer.position, fish.position
+            )
+        )
+        observations = []
+        for fish in in_view[: raw_env.prey_observe_count]:
+            observations += raw_env.nearby_animal_observation(observer, fish)
+        slots = raw_env.prey_observe_count * raw_env.obs_size
+        observations += [0] * (slots - len(observations))
+        return observations
+
+    raw_env.predator_nearby_fish_observations = predator_nearby_fish_observations
+
+
 class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
     """ParallelPettingZooEnv with Aquarium-specific fixes (see Codex
-    review, 2026-09-18). Besides the two below, __init__ applies
-    _patch_predator_catch_rewards (respawn mode) or
-    _patch_prey_death (no-respawn mode).
+    review, 2026-09-18). Besides the ones below, __init__ applies
+    _patch_torus_view and _patch_predator_vision, plus
+    _patch_predator_catch_rewards (respawn mode) or _patch_prey_death
+    (no-respawn mode).
 
     1. Aquarium's own close() unconditionally calls sys.exit()
        (marl_aquarium/env/aquarium.py:320, apparently meant for a pygame
@@ -154,6 +273,8 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
     def __init__(self, env, reward_scale: float = 1.0):
         super().__init__(env)
         self.reward_scale = reward_scale
+        _patch_torus_view(env.aec_env.unwrapped)
+        _patch_predator_vision(env.aec_env.unwrapped)
         _patch_predator_catch_rewards(env.aec_env.unwrapped)
         _patch_prey_death(env.aec_env.unwrapped)
 
