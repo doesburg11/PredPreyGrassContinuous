@@ -1,0 +1,5 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.conda/bin/python",
+    "flake8.interpreter": ["${workspaceFolder}/.conda/bin/python"],
+    "ruff.interpreter": ["${workspaceFolder}/.conda/bin/python"]
+}
