@@ -64,10 +64,74 @@ def _patch_predator_catch_rewards(raw_env) -> None:
     raw_env.get_rewards = get_rewards
 
 
+def _patch_prey_death(raw_env) -> None:
+    """Make keep_prey_count_constant=False (prey die for good) usable.
+
+    1. Aquarium's prey_observe pads its output to prey_count entries, using
+       made-up "fish_<i>" IDs for every dead prey's slot. Those IDs are not
+       agents, so PettingZoo's parallel/AEC conversion crashes with a
+       KeyError on the first step after a death. Only observe live prey;
+       Aquarium's step already fills a zero observation for the prey that
+       died this step.
+    2. Aquarium removes a caught prey from raw_env.prey before computing
+       rewards, and get_prey_rewards only applies prey_punishment to a
+       *respawned* prey (recently_died). So a prey that dies for good gets a
+       final reward of 0 -- no death penalty at all. Give each prey killed
+       this step -prey_punishment instead.
+    3. Aquarium's step() loops over raw_env.all_entities while update_prey
+       removes the dead prey from that same list, so the entity right after
+       it is silently skipped that step (no movement, action ignored).
+       Rebind all_entities to a copy before each prey update, so the removal
+       hits the copy and step()'s loop keeps iterating the original.
+    """
+    needed = (
+        "prey_observe",
+        "get_prey_observations",
+        "get_rewards",
+        "update_prey",
+        "all_entities",
+        "prey_punishment",
+        "keep_prey_count_constant",
+    )
+    missing = [name for name in needed if not hasattr(raw_env, name)]
+    if missing:
+        raise RuntimeError(
+            f"marl_aquarium internals changed (missing {missing}); "
+            "_patch_prey_death needs updating"
+        )
+    if raw_env.keep_prey_count_constant:
+        return  # respawn mode: no prey ever dies
+    if getattr(raw_env, "_prey_death_patched", False):
+        return
+    raw_env._prey_death_patched = True
+    original_get_rewards = raw_env.get_rewards
+    original_update_prey = raw_env.update_prey
+
+    def update_prey(prey, predators, desired_velocity):
+        raw_env.all_entities = list(raw_env.all_entities)
+        return original_update_prey(prey, predators, desired_velocity)
+
+    def prey_observe():
+        return {
+            prey.id(): raw_env.get_prey_observations(prey) for prey in raw_env.prey
+        }
+
+    def get_rewards(catches):
+        rewards = original_get_rewards(catches)
+        for catch in catches:
+            rewards[catch["killed"]] = -raw_env.prey_punishment
+        return rewards
+
+    raw_env.update_prey = update_prey
+    raw_env.prey_observe = prey_observe
+    raw_env.get_rewards = get_rewards
+
+
 class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
     """ParallelPettingZooEnv with Aquarium-specific fixes (see Codex
     review, 2026-09-18). Besides the two below, __init__ applies
-    _patch_predator_catch_rewards.
+    _patch_predator_catch_rewards (respawn mode) or
+    _patch_prey_death (no-respawn mode).
 
     1. Aquarium's own close() unconditionally calls sys.exit()
        (marl_aquarium/env/aquarium.py:320, apparently meant for a pygame
@@ -81,12 +145,17 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
        isolate multiple Aquarium envs sharing one process (e.g. num_env_runners
        with more than one env per runner), since they'd still share one global
        stream. Fixing that properly requires an upstream Aquarium change.
+    3. In no-respawn mode, Aquarium ends the episode when the last prey dies
+       by marking every agent *truncated*, which tells RLlib to bootstrap the
+       predator's value as if the episode could have gone on. Nothing is left
+       to catch, so report it as a termination instead.
     """
 
     def __init__(self, env, reward_scale: float = 1.0):
         super().__init__(env)
         self.reward_scale = reward_scale
         _patch_predator_catch_rewards(env.aec_env.unwrapped)
+        _patch_prey_death(env.aec_env.unwrapped)
 
     def reset(self, *, seed=None, options=None):
         # Drop catch events left over from a step that raised mid-way.
@@ -97,6 +166,10 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
 
     def step(self, action_dict):
         obs, rewards, terminateds, truncateds, infos = super().step(action_dict)
+        raw_env = self.par_env.aec_env.unwrapped
+        if not raw_env.keep_prey_count_constant and not raw_env.prey:
+            terminateds = {agent: True for agent in terminateds}
+            truncateds = {agent: False for agent in truncateds}
         if self.reward_scale != 1.0:
             rewards = {agent: r * self.reward_scale for agent, r in rewards.items()}
         return obs, rewards, terminateds, truncateds, infos

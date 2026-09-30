@@ -123,6 +123,13 @@ def main():
         default=None,
         help="Predator field of view in degrees (Aquarium's default is 150).",
     )
+    parser.add_argument(
+        "--no-respawn",
+        action="store_true",
+        help="Caught prey die for good (terminated, removed from the episode) "
+        "instead of respawning at a random position. Still punished with "
+        "-prey_punishment on death.",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
     parser.add_argument(
@@ -201,6 +208,8 @@ def main():
         env_config["prey_fov"] = args.prey_fov
     if args.predator_fov is not None:
         env_config["predator_fov"] = args.predator_fov
+    if args.no_respawn:
+        env_config["keep_prey_count_constant"] = False
 
     config = (
         PPOConfig()

@@ -139,6 +139,12 @@ def main():
         help="Same as --prey-fov but for predators (Aquarium's default is "
         "150).",
     )
+    parser.add_argument(
+        "--no-respawn",
+        action="store_true",
+        help="Caught prey die for good instead of respawning. A --checkpoint "
+        "trained with train.py --no-respawn already has this set.",
+    )
     parser.add_argument("--episodes", type=_positive_int, default=1)
     parser.add_argument(
         "--render", choices=["window", "video", "none"], default="window"
@@ -180,6 +186,8 @@ def main():
         env_config["prey_fov"] = args.prey_fov
     if args.predator_fov is not None:
         env_config["predator_fov"] = args.predator_fov
+    if args.no_respawn:
+        env_config["keep_prey_count_constant"] = False
     env = make_env(env_config)
 
     summary = []  # (predator_return, prey_return, prey_eaten) per episode
@@ -203,9 +211,13 @@ def main():
                     is_predator = agent_id.startswith("predator")
                     species = "predator" if is_predator else "prey"
                     species_return[species] += reward
-                    # Aquarium's default prey_punishment (1000) dwarfs every
-                    # other per-step reward, so this only fires on a catch.
-                    if species == "prey" and reward <= -500:
+                    # A prey that dies for good (--no-respawn) is terminated.
+                    # A respawned prey isn't, but gets Aquarium's default
+                    # prey_punishment (1000), which dwarfs every other
+                    # per-step reward, so the threshold only fires on a catch.
+                    if species == "prey" and (
+                        terminateds.get(agent_id) or reward <= -500
+                    ):
                         prey_eaten += 1
                 steps += 1
                 if args.render != "none":
