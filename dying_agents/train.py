@@ -17,13 +17,13 @@ import math
 import time
 
 import numpy as np
-from tensorboardX import SummaryWriter
-
-from env_wrapper import ENV_NAME, register
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
 from ray.rllib.core.rl_module.multi_rl_module import MultiRLModuleSpec
 from ray.rllib.core.rl_module.rl_module import RLModuleSpec
+from tensorboardX import SummaryWriter
+
+from env_wrapper import ENV_NAME, register
 
 
 def _species_of(agent_id: str) -> str:
@@ -42,11 +42,12 @@ def _flatten_scalars(prefix: str, value, out: dict) -> None:
     if isinstance(value, dict):
         for key, sub in value.items():
             _flatten_scalars(f"{prefix}/{key}" if prefix else str(key), sub, out)
-    elif isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(
-        value, bool
+    elif (
+        isinstance(value, (int, float, np.integer, np.floating))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
     ):
-        if math.isfinite(value):
-            out[prefix] = float(value)
+        out[prefix] = float(value)
 
 
 def build_policies(mode: str, predator_count: int, prey_count: int):
@@ -185,7 +186,9 @@ def main():
 
     register()
 
-    policies, mapping_fn = build_policies(args.mode, args.predator_count, args.prey_count)
+    policies, mapping_fn = build_policies(
+        args.mode, args.predator_count, args.prey_count
+    )
 
     env_config = {
         "predator_count": args.predator_count,
@@ -233,10 +236,8 @@ def main():
             env_runner_stats = result.get("env_runners", {})
             reward_mean = env_runner_stats.get("episode_return_mean")
             num_episodes = env_runner_stats.get("num_episodes")
-            module_returns = {
-                k: round(v, 1)
-                for k, v in env_runner_stats.get("module_episode_returns_mean", {}).items()
-            }
+            module_means = env_runner_stats.get("module_episode_returns_mean", {})
+            module_returns = {k: round(v, 1) for k, v in module_means.items()}
             if writer is not None:
                 scalars = {}
                 _flatten_scalars("", result, scalars)
