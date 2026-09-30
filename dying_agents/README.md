@@ -1,4 +1,9 @@
-# aquarium-rllib
+# PredPreyGrassContinuous
+
+A continuous-space counterpart to the grid-based
+[PredPreyGrass](https://github.com/doesburg11/PredPreyGrass), built on Aquarium.
+There is no grass layer yet: so far it adds agents that die for good
+(`--no-respawn`) on top of the Aquarium port described below.
 
 Runs [Aquarium](https://github.com/michaelkoelle/marl-aquarium) (Kölle, Erpelding,
 Ritz, Phan, Illium & Linnhoff-Popien, 2024) — a PettingZoo-native, physics-based
