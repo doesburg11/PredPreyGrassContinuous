@@ -61,11 +61,13 @@ ray's dependencies to satisfy Aquarium's stale pins. The one real exception is
 that one genuinely needs the pinned `moviepy==1.0.3`.
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
+# Run from dying_agents/ (the directory containing train.py).
+conda create --prefix ../.conda python=3.11 pip -y
+conda activate ../.conda
 pip install "ray[rllib]==2.58.0" torch --extra-index-url https://download.pytorch.org/whl/cpu
 pip install --no-deps marl-aquarium==0.1.10
-pip install --no-deps moviepy==1.0.3
+pip install "pettingzoo==1.24.2" "pygame==2.6.1"
+pip install moviepy==1.0.3
 ```
 
 (Swap the `torch` line for a CUDA wheel if you want GPU training; CPU is enough

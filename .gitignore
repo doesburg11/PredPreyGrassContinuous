@@ -1,4 +1,4 @@
-.venv/
+.conda/
 __pycache__/
 *.pyc
 ray_results/
