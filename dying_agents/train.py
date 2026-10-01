@@ -140,6 +140,16 @@ def main():
         "relative to the observer, a seen flag per slot; see "
         "env_wrapper._patch_egocentric_obs). Checkpoints remember it.",
     )
+    parser.add_argument(
+        "--predator-shaping",
+        type=_non_negative_float,
+        default=0.0,
+        help="Potential-based reward shaping for predators: Phi = -C * "
+        "(distance to the nearest prey) / (half the arena diagonal), so each "
+        "step adds 0.99 * Phi(next) - Phi(now) (before --reward-scale). The "
+        "catch reward is 10; try C = 1. 0 (default) = off. eval.py reports "
+        "unshaped rewards.",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
     parser.add_argument(
@@ -240,6 +250,7 @@ def main():
         "render_mode": None,
         "reward_scale": args.reward_scale,
         "obs_mode": args.obs,
+        "predator_shaping": args.predator_shaping,
     }
     if args.prey_fov is not None:
         env_config["prey_fov"] = args.prey_fov

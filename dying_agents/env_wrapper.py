@@ -412,7 +412,14 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
        to catch, so report it as a termination instead.
     """
 
-    def __init__(self, env, reward_scale: float = 1.0, obs_mode: str = "aquarium"):
+    def __init__(
+        self,
+        env,
+        reward_scale: float = 1.0,
+        obs_mode: str = "aquarium",
+        predator_shaping: float = 0.0,
+        shaping_gamma: float = 0.99,
+    ):
         if obs_mode not in OBS_MODES:
             raise ValueError(f"obs_mode must be one of {OBS_MODES}, got {obs_mode!r}")
         raw_env = env.aec_env.unwrapped
@@ -426,13 +433,39 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             _patch_egocentric_obs(raw_env)
         super().__init__(env)
         self.reward_scale = reward_scale
+        self.predator_shaping = predator_shaping
+        self.shaping_gamma = shaping_gamma
+        self._potentials = {}
+
+    def _predator_potentials(self):
+        """Phi(s) = -predator_shaping * (torus distance to the nearest prey)
+        / (half the arena diagonal), per predator; 0 once no prey is left
+        (the terminal state of a no-respawn episode)."""
+        raw_env = self.par_env.aec_env.unwrapped
+        scale = math.hypot(raw_env.width, raw_env.height) / 2
+        potentials = {}
+        for predator in raw_env.predators:
+            if raw_env.prey:
+                nearest = min(
+                    raw_env.torus.get_distance_in_torus(
+                        predator.position, prey.position
+                    )
+                    for prey in raw_env.prey
+                )
+                potentials[predator.id()] = -self.predator_shaping * nearest / scale
+            else:
+                potentials[predator.id()] = 0.0
+        return potentials
 
     def reset(self, *, seed=None, options=None):
         # Drop catch events left over from a step that raised mid-way.
         getattr(self.par_env.aec_env.unwrapped, "_pending_catches", []).clear()
         if seed is not None:
             random.seed(seed)
-        return super().reset(seed=seed, options=options)
+        result = super().reset(seed=seed, options=options)
+        if self.predator_shaping:
+            self._potentials = self._predator_potentials()
+        return result
 
     def step(self, action_dict):
         obs, rewards, terminateds, truncateds, infos = super().step(action_dict)
@@ -440,6 +473,18 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         if not raw_env.keep_prey_count_constant and not raw_env.prey:
             terminateds = {agent: True for agent in terminateds}
             truncateds = {agent: False for agent in truncateds}
+        if self.predator_shaping:
+            # Potential-based shaping (Ng, Harada & Russell 1999): adding
+            # gamma * Phi(s') - Phi(s) leaves the optimal policy unchanged,
+            # so the predator can't profit from hovering near prey.
+            potentials = self._predator_potentials()
+            for agent, potential in potentials.items():
+                if agent in rewards:
+                    rewards[agent] += (
+                        self.shaping_gamma * potential
+                        - self._potentials.get(agent, potential)
+                    )
+            self._potentials = potentials
         if self.reward_scale != 1.0:
             rewards = {agent: r * self.reward_scale for agent, r in rewards.items()}
         return obs, rewards, terminateds, truncateds, infos
@@ -456,7 +501,10 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     aquarium_v0.parallel_env(), except `reward_scale` (multiplies every reward,
     default 1.0; PPO's value-loss clipping copes badly with Aquarium's -1000
     prey punishment), `obs_mode` ("aquarium", the default, or "egocentric";
-    see _patch_egocentric_obs) and `procreate` which is rejected: with
+    see _patch_egocentric_obs), `predator_shaping` / `shaping_gamma`
+    (potential-based reward for predators closing in on the nearest prey,
+    off by default; shaping_gamma should match PPO's gamma, 0.99) and
+    `procreate` which is rejected: with
     it enabled, Aquarium creates prey IDs absent from the initial
     possible_agents/observation-space snapshot that ParallelPettingZooEnv
     takes at construction time, and train.py's IL mode has no policy for an
@@ -465,6 +513,8 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     env_config = dict(env_config or {})
     reward_scale = env_config.pop("reward_scale", 1.0)
     obs_mode = env_config.pop("obs_mode", "aquarium")
+    predator_shaping = env_config.pop("predator_shaping", 0.0)
+    shaping_gamma = env_config.pop("shaping_gamma", 0.99)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
         raise ValueError(
@@ -477,6 +527,8 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
         aquarium_v0.parallel_env(**env_config),
         reward_scale=reward_scale,
         obs_mode=obs_mode,
+        predator_shaping=predator_shaping,
+        shaping_gamma=shaping_gamma,
     )
 
 

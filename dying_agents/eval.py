@@ -176,6 +176,7 @@ def main():
     env_config.update(
         # report raw Aquarium rewards even for a scaled-reward checkpoint
         reward_scale=1.0,
+        predator_shaping=0.0,
         render_mode=None if args.render == "none" else "rgb_array",
         draw_view_cones=args.draw_view_cones,
         draw_force_vectors=args.draw_force_vectors,

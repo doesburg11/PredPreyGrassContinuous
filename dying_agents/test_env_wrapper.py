@@ -333,3 +333,100 @@ def test_egocentric_rejects_disabled_fov():
 def test_unknown_obs_mode_is_rejected():
     with pytest.raises(ValueError, match="obs_mode"):
         make_env({"obs_mode": "nope"})
+
+
+# --- predator reward shaping -------------------------------------------------
+
+
+def _shaping_env(**env_config):
+    config = {
+        "predator_count": 1,
+        "prey_count": 2,
+        "max_time_steps": 300,
+        "render_mode": None,
+        "obs_mode": "egocentric",
+    }
+    config.update(env_config)
+    return make_env(config)
+
+
+def test_shaping_rewards_closing_in():
+    env = _shaping_env(predator_shaping=1.0, shaping_gamma=1.0)
+    env.reset(seed=0)
+    raw_env = env.par_env.aec_env.unwrapped
+    predator = raw_env.predators[0]
+    predator.position = Vector(400, 400)
+    raw_env.prey[0].position = Vector(400, 600)
+    raw_env.prey[1].position = Vector(0, 0)
+    env._potentials = env._predator_potentials()
+    before = env._potentials["predator_0"]
+    predator.position = Vector(400, 500)  # 100 closer to prey_0
+    after = env._predator_potentials()["predator_0"]
+    assert after - before == pytest.approx(100 / (math.hypot(800, 800) / 2))
+
+
+def _paired_steps(shaped, plain, steps, seed):
+    """Step both envs with the same actions and the same draws from Python's
+    global `random` (Aquarium uses it for respawns), so they stay in lockstep
+    and their reward difference is the shaping alone. Yields
+    (Phi before, Phi after, shaped rewards, plain rewards)."""
+    rng = np.random.default_rng(seed)
+    for _ in range(steps):
+        actions = {agent: int(rng.integers(16)) for agent in shaped.agents}
+        before = dict(shaped._potentials)
+        state = random.getstate()
+        _, r_shaped, *_ = shaped.step(actions)
+        random.setstate(state)
+        _, r_plain, *_ = plain.step(actions)
+        yield before, dict(shaped._potentials), r_shaped, r_plain
+
+
+@pytest.mark.parametrize("respawn", [True, False])
+def test_shaping_step_adds_gamma_phi_difference_before_scaling(respawn):
+    common = {"keep_prey_count_constant": respawn, "reward_scale": 0.01}
+    shaped = _shaping_env(predator_shaping=1.0, shaping_gamma=0.9, **common)
+    plain = _shaping_env(**common)
+    random.seed(5)
+    shaped.reset()
+    random.seed(5)
+    plain.reset()
+    for before, after, r_shaped, r_plain in _paired_steps(shaped, plain, 200, 0):
+        for agent in r_plain:
+            if agent.startswith("prey"):
+                assert r_shaped[agent] == r_plain[agent]
+        if "predator_0" in r_plain:
+            expected = 0.01 * (0.9 * after["predator_0"] - before["predator_0"])
+            diff = r_shaped["predator_0"] - r_plain["predator_0"]
+            assert diff == pytest.approx(expected)
+
+
+def test_shaping_telescopes_over_an_episode():
+    # With gamma = 1 the shaping terms of an episode sum to
+    # Phi(last) - Phi(first): it adds no net reward for loitering.
+    shaped = _shaping_env(predator_shaping=1.0, shaping_gamma=1.0)
+    plain = _shaping_env()
+    random.seed(3)
+    shaped.reset()
+    random.seed(3)
+    plain.reset()
+    first = shaped._potentials["predator_0"]
+    total = sum(
+        r_shaped["predator_0"] - r_plain["predator_0"]
+        for _, _, r_shaped, r_plain in _paired_steps(shaped, plain, 100, 0)
+    )
+    assert total == pytest.approx(shaped._potentials["predator_0"] - first)
+
+
+def test_shaping_potential_is_zero_once_all_prey_are_gone():
+    env = _shaping_env(predator_shaping=1.0, keep_prey_count_constant=False)
+    env.reset(seed=0)
+    raw_env = env.par_env.aec_env.unwrapped
+    raw_env.prey.clear()
+    assert env._predator_potentials() == {"predator_0": 0.0}
+
+
+def test_shaping_off_by_default():
+    plain = _shaping_env()
+    plain.reset(seed=1)
+    plain.step({agent: 0 for agent in plain.agents})
+    assert plain._potentials == {}
