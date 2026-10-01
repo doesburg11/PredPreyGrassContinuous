@@ -168,7 +168,7 @@ def main():
             "max_time_steps": args.max_time_steps,
         }
     else:
-        algo = Algorithm.from_checkpoint(args.checkpoint)
+        algo = Algorithm.from_checkpoint(str(Path(args.checkpoint).resolve()))
         assert algo.config is not None, "restored Algorithm has no config"
         mapping_fn = algo.config.policy_mapping_fn
         env_config = dict(algo.config.env_config)

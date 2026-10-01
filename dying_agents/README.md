@@ -36,7 +36,8 @@ not an extension of the reproduction research itself.
   - `--mode ps`: parameter sharing, one shared policy per species
     (`predator_policy`, `prey_policy`).
   - `--checkpoint-dir <dir>` saves an RLlib checkpoint after training, for use
-    with `eval.py`.
+    with `eval.py`. Add `--checkpoint-every N` to also save one every N
+    iterations, to `<dir>/iter_<NNNNNN>`.
 - `eval.py` — rolls out either a checkpoint from `train.py --checkpoint-dir`
   (greedily: argmax over each policy's action logits, no exploration) or, with
   `--random`, a uniform-random baseline with no RLlib/checkpoint involved at

@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import math
+import os
 import time
 
 import numpy as np
@@ -187,9 +188,25 @@ def main():
         "`eval.py --checkpoint <dir>` to visualize the trained agents). If "
         "omitted, no checkpoint is saved.",
     )
+    parser.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=0,
+        help="Also save a checkpoint every N iterations, to "
+        "<checkpoint-dir>/iter_<NNNNNN> (0 = only the final one). Needs "
+        "--checkpoint-dir.",
+    )
     args = parser.parse_args()
     if args.num_env_runners < 0:
         parser.error("--num-env-runners must be >= 0")
+    if args.checkpoint_every < 0:
+        parser.error("--checkpoint-every must be >= 0")
+    if args.checkpoint_every and not args.checkpoint_dir:
+        parser.error("--checkpoint-every needs --checkpoint-dir")
+    if args.checkpoint_dir:
+        # algo.save() hands the path to pyarrow, which rejects relative paths
+        # ("URI has empty scheme") -- only after training has finished.
+        args.checkpoint_dir = os.path.abspath(args.checkpoint_dir)
 
     register()
 
@@ -258,8 +275,18 @@ def main():
                 f"episode_return_mean={reward_mean}  "
                 f"num_episodes={num_episodes}  "
                 f"module_returns={module_returns}  "
-                f"{time.time() - t0:.1f}s"
+                f"{time.time() - t0:.1f}s",
+                flush=True,
             )
+            done = i + 1
+            if (
+                args.checkpoint_every
+                and done % args.checkpoint_every == 0
+                and done < args.iterations
+            ):
+                path = os.path.join(args.checkpoint_dir, f"iter_{done:06d}")
+                algo.save(path)
+                print(f"checkpoint saved to {path}", flush=True)
         if args.checkpoint_dir:
             result = algo.save(args.checkpoint_dir)
             print(f"checkpoint saved to {result.checkpoint.path}")
