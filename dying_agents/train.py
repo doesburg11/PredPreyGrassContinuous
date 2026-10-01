@@ -131,6 +131,15 @@ def main():
         "instead of respawning at a random position. Still punished with "
         "-prey_punishment on death.",
     )
+    parser.add_argument(
+        "--obs",
+        choices=["aquarium", "egocentric"],
+        default="aquarium",
+        help="Observation encoding: Aquarium's own (absolute positions, "
+        "bearings as angles) or egocentric (wrapped offsets and velocities "
+        "relative to the observer, a seen flag per slot; see "
+        "env_wrapper._patch_egocentric_obs). Checkpoints remember it.",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
     parser.add_argument(
@@ -230,6 +239,7 @@ def main():
         "max_time_steps": args.max_time_steps,
         "render_mode": None,
         "reward_scale": args.reward_scale,
+        "obs_mode": args.obs,
     }
     if args.prey_fov is not None:
         env_config["prey_fov"] = args.prey_fov
