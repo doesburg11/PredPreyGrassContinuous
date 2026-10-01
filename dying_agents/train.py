@@ -175,6 +175,14 @@ def main():
         help="Remote learner actors (0 = learn inside the driver process).",
     )
     parser.add_argument(
+        "--num-gpus-per-learner",
+        type=float,
+        default=0,
+        help="GPUs for each learner (or for the driver's own learner when "
+        "--num-learners is 0), e.g. 1 to run the PPO update on the GPU and "
+        "leave the CPU to the env. Needs a CUDA build of torch.",
+    )
+    parser.add_argument(
         "--tensorboard-dir",
         default=None,
         help="Write every numeric metric RLlib reports each iteration here as "
@@ -203,6 +211,8 @@ def main():
         parser.error("--checkpoint-every must be >= 0")
     if args.checkpoint_every and not args.checkpoint_dir:
         parser.error("--checkpoint-every needs --checkpoint-dir")
+    if args.num_gpus_per_learner < 0:
+        parser.error("--num-gpus-per-learner must be >= 0")
     if args.checkpoint_dir:
         # algo.save() hands the path to pyarrow, which rejects relative paths
         # ("URI has empty scheme") -- only after training has finished.
@@ -243,7 +253,10 @@ def main():
             grad_clip=args.grad_clip,
             grad_clip_by="global_norm",
         )
-        .learners(num_learners=args.num_learners)
+        .learners(
+            num_learners=args.num_learners,
+            num_gpus_per_learner=args.num_gpus_per_learner,
+        )
         .multi_agent(policies=policies, policy_mapping_fn=mapping_fn)
         .rl_module(
             rl_module_spec=MultiRLModuleSpec(

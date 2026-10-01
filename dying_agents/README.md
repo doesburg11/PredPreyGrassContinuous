@@ -76,8 +76,11 @@ pip install "pettingzoo==1.24.2" "pygame==2.6.1"
 pip install moviepy==1.0.3
 ```
 
-(Swap the `torch` line for a CUDA wheel if you want GPU training; CPU is enough
-for a smoke test.)
+(Swap the `torch` line for a CUDA wheel if you want GPU training, e.g.
+`pip install "torch==2.14.1+cu132" --index-url https://download.pytorch.org/whl/cu132`,
+then pass `train.py --num-gpus-per-learner 1`. With the default
+`--minibatch-size 128` the GPU is *slower* than the CPU (hundreds of tiny
+updates per iteration); it only pays off with larger minibatches, e.g. 1024.)
 
 ## Run
 
