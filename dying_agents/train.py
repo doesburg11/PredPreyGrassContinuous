@@ -168,6 +168,20 @@ def main():
         "0.0, i.e. no pressure against a policy collapsing to a near-constant "
         "action -- see runs/ps_1000's prey_policy). Try e.g. 0.01.",
     )
+    parser.add_argument(
+        "--lr",
+        type=_positive_float,
+        default=5e-5,
+        help="PPO learning rate (RLlib's default 5e-5 is small for these "
+        "networks; try 3e-4).",
+    )
+    parser.add_argument(
+        "--gae-lambda",
+        type=float,
+        default=1.0,
+        help="GAE lambda (RLlib's default 1.0 means Monte Carlo advantages; "
+        "0.95 is the common choice).",
+    )
     parser.add_argument("--train-batch-size", type=_positive_int, default=4000)
     parser.add_argument("--minibatch-size", type=_positive_int, default=128)
     parser.add_argument("--num-epochs", type=_positive_int, default=30)
@@ -232,6 +246,8 @@ def main():
         parser.error("--checkpoint-every needs --checkpoint-dir")
     if args.num_gpus_per_learner < 0:
         parser.error("--num-gpus-per-learner must be >= 0")
+    if not 0.0 <= args.gae_lambda <= 1.0:
+        parser.error("--gae-lambda must be in [0, 1]")
     if args.checkpoint_dir:
         # algo.save() hands the path to pyarrow, which rejects relative paths
         # ("URI has empty scheme") -- only after training has finished.
@@ -270,6 +286,8 @@ def main():
             train_batch_size_per_learner=args.train_batch_size,
             minibatch_size=args.minibatch_size,
             num_epochs=args.num_epochs,
+            lr=args.lr,
+            lambda_=args.gae_lambda,
             entropy_coeff=args.entropy_coeff,
             grad_clip=args.grad_clip,
             grad_clip_by="global_norm",
