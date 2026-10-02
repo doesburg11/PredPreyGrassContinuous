@@ -419,7 +419,10 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         obs_mode: str = "aquarium",
         predator_shaping: float = 0.0,
         shaping_gamma: float = 0.99,
+        action_repeat: int = 1,
     ):
+        if action_repeat < 1:
+            raise ValueError(f"action_repeat must be >= 1, got {action_repeat}")
         if obs_mode not in OBS_MODES:
             raise ValueError(f"obs_mode must be one of {OBS_MODES}, got {obs_mode!r}")
         raw_env = env.aec_env.unwrapped
@@ -435,6 +438,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         self.reward_scale = reward_scale
         self.predator_shaping = predator_shaping
         self.shaping_gamma = shaping_gamma
+        self.action_repeat = action_repeat
         self._potentials = {}
 
     def _predator_potentials(self):
@@ -467,12 +471,40 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             self._potentials = self._predator_potentials()
         return result
 
-    def step(self, action_dict):
+    def _env_step(self, action_dict):
         obs, rewards, terminateds, truncateds, infos = super().step(action_dict)
         raw_env = self.par_env.aec_env.unwrapped
         if not raw_env.keep_prey_count_constant and not raw_env.prey:
             terminateds = {agent: True for agent in terminateds}
             truncateds = {agent: False for agent in truncateds}
+        return obs, rewards, terminateds, truncateds, infos
+
+    def step(self, action_dict):
+        # Apply each action for action_repeat env steps, summing rewards. An
+        # agent that is done mid-way keeps its last obs/flags and drops out
+        # of the remaining sub-steps; Aquarium's max_time_steps still counts
+        # env steps.
+        obs, rewards, terminateds, truncateds, infos = {}, {}, {}, {}, {}
+        actions = dict(action_dict)
+        for _ in range(self.action_repeat):
+            step_obs, step_rewards, step_terms, step_truncs, step_infos = (
+                self._env_step(actions)
+            )
+            obs.update(step_obs)
+            for agent, reward in step_rewards.items():
+                rewards[agent] = rewards.get(agent, 0.0) + reward
+            terminateds.update(step_terms)
+            truncateds.update(step_truncs)
+            infos.update(step_infos)
+            if step_terms.get("__all__") or step_truncs.get("__all__"):
+                break
+            actions = {
+                agent: action
+                for agent, action in actions.items()
+                if not (step_terms.get(agent) or step_truncs.get(agent))
+            }
+            if not actions:
+                break
         if self.predator_shaping:
             # Potential-based shaping (Ng, Harada & Russell 1999): adding
             # gamma * Phi(s') - Phi(s) leaves the optimal policy unchanged,
@@ -503,7 +535,9 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     prey punishment), `obs_mode` ("aquarium", the default, or "egocentric";
     see _patch_egocentric_obs), `predator_shaping` / `shaping_gamma`
     (potential-based reward for predators closing in on the nearest prey,
-    off by default; shaping_gamma should match PPO's gamma, 0.99) and
+    off by default; shaping_gamma should match PPO's gamma, 0.99),
+    `action_repeat` (apply each action for N env steps, summing rewards;
+    default 1) and
     `procreate` which is rejected: with
     it enabled, Aquarium creates prey IDs absent from the initial
     possible_agents/observation-space snapshot that ParallelPettingZooEnv
@@ -515,6 +549,7 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     obs_mode = env_config.pop("obs_mode", "aquarium")
     predator_shaping = env_config.pop("predator_shaping", 0.0)
     shaping_gamma = env_config.pop("shaping_gamma", 0.99)
+    action_repeat = env_config.pop("action_repeat", 1)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
         raise ValueError(
@@ -529,6 +564,7 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
         obs_mode=obs_mode,
         predator_shaping=predator_shaping,
         shaping_gamma=shaping_gamma,
+        action_repeat=action_repeat,
     )
 
 

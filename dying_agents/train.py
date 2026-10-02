@@ -150,6 +150,15 @@ def main():
         "catch reward is 10; try C = 1. 0 (default) = off. eval.py reports "
         "unshaped rewards.",
     )
+    parser.add_argument(
+        "--action-repeat",
+        type=_positive_int,
+        default=1,
+        help="Apply each chosen action for N env steps (rewards summed), so "
+        "an episode of --max-time-steps env steps has about 1/N as many "
+        "decisions. Aquarium's predators turn slowly, so single-step "
+        "actions barely change anything.",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=0)
     parser.add_argument(
@@ -267,6 +276,7 @@ def main():
         "reward_scale": args.reward_scale,
         "obs_mode": args.obs,
         "predator_shaping": args.predator_shaping,
+        "action_repeat": args.action_repeat,
     }
     if args.prey_fov is not None:
         env_config["prey_fov"] = args.prey_fov

@@ -315,7 +315,7 @@ def test_egocentric_dead_prey_gets_zero_observation():
     predator = raw_env.predators[0]
     victim = raw_env.prey[0]
     victim.position = predator.position.copy()  # collides on the next step
-    obs, _, terminateds, _, _ = env.step({agent: 0 for agent in env.agents})
+    obs, _, terminateds, _, _ = env.step({agent: 0 for agent in env.par_env.agents})
     assert terminateds[victim.id()]
     victim_obs = np.asarray(obs[victim.id()], dtype=np.float32)
     assert victim_obs.shape == (EGO_SIZE,) and not victim_obs.any()
@@ -372,7 +372,7 @@ def _paired_steps(shaped, plain, steps, seed):
     (Phi before, Phi after, shaped rewards, plain rewards)."""
     rng = np.random.default_rng(seed)
     for _ in range(steps):
-        actions = {agent: int(rng.integers(16)) for agent in shaped.agents}
+        actions = {agent: int(rng.integers(16)) for agent in shaped.par_env.agents}
         before = dict(shaped._potentials)
         state = random.getstate()
         _, r_shaped, *_ = shaped.step(actions)
@@ -428,5 +428,86 @@ def test_shaping_potential_is_zero_once_all_prey_are_gone():
 def test_shaping_off_by_default():
     plain = _shaping_env()
     plain.reset(seed=1)
-    plain.step({agent: 0 for agent in plain.agents})
+    plain.step({agent: 0 for agent in plain.par_env.agents})
     assert plain._potentials == {}
+
+
+# --- action repeat -----------------------------------------------------------
+
+
+def _repeat_env(repeat, **env_config):
+    config = {
+        "predator_count": 1,
+        "prey_count": 4,
+        "max_time_steps": 200,
+        "render_mode": None,
+        "obs_mode": "egocentric",
+        "action_repeat": repeat,
+    }
+    config.update(env_config)
+    return make_env(config)
+
+
+@pytest.mark.parametrize("respawn", [True, False])
+def test_action_repeat_equals_repeated_single_steps(respawn):
+    repeated = _repeat_env(4, keep_prey_count_constant=respawn)
+    single = _repeat_env(1, keep_prey_count_constant=respawn)
+    random.seed(7)
+    repeated.reset()
+    random.seed(7)
+    single.reset()
+    rng = np.random.default_rng(7)
+    for _ in range(40):
+        actions = {agent: int(rng.integers(16)) for agent in repeated.par_env.agents}
+        state = random.getstate()
+        obs_r, rew_r, term_r, trunc_r, _ = repeated.step(actions)
+        random.setstate(state)
+        obs_s, rew_s, term_s, trunc_s = {}, {}, {}, {}
+        remaining = dict(actions)
+        for _ in range(4):
+            o, r, te, tr, _ = single.step(remaining)
+            obs_s.update(o)
+            for agent, reward in r.items():
+                rew_s[agent] = rew_s.get(agent, 0.0) + reward
+            term_s.update(te)
+            trunc_s.update(tr)
+            if te["__all__"] or tr["__all__"]:
+                break
+            remaining = {a: x for a, x in remaining.items() if not (te[a] or tr[a])}
+        assert rew_r == pytest.approx(rew_s)
+        assert term_r == term_s and trunc_r == trunc_s
+        for agent, agent_obs in obs_s.items():
+            np.testing.assert_array_equal(obs_r[agent], agent_obs)
+        if term_r["__all__"] or trunc_r["__all__"]:
+            break
+
+
+def test_action_repeat_handles_death_mid_repeat():
+    env = _repeat_env(4, keep_prey_count_constant=False)
+    env.reset(seed=0)
+    raw_env = env.par_env.aec_env.unwrapped
+    victim = raw_env.prey[0]
+    victim.position = raw_env.predators[0].position.copy()
+    actions = {agent: 0 for agent in env.par_env.agents}
+    obs, rewards, terminateds, _, _ = env.step(actions)
+    assert terminateds[victim.id()]
+    assert not np.asarray(obs[victim.id()]).any()
+    assert rewards[victim.id()] <= -raw_env.prey_punishment + 4  # death once
+    assert victim.id() not in env.step({agent: 0 for agent in env.par_env.agents})[0]
+
+
+def test_action_repeat_shortens_episodes():
+    env = _repeat_env(4)
+    env.reset(seed=0)
+    decisions = 0
+    while True:
+        decisions += 1
+        *_, terminateds, truncateds, _ = env.step({a: 0 for a in env.par_env.agents})
+        if terminateds["__all__"] or truncateds["__all__"]:
+            break
+    assert decisions == math.ceil(202 / 4)  # Aquarium runs 202 env steps
+
+
+def test_action_repeat_must_be_positive():
+    with pytest.raises(ValueError, match="action_repeat"):
+        make_env({"action_repeat": 0})

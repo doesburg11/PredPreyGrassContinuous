@@ -81,6 +81,7 @@ def run(predator_kind, prey_kind, args):
             "max_time_steps": args.max_time_steps,
             "obs_mode": "egocentric",
             "keep_prey_count_constant": not args.no_respawn,
+            "action_repeat": args.action_repeat,
         }
     )
     raw_env = env.par_env.aec_env.unwrapped
@@ -101,7 +102,8 @@ def run(predator_kind, prey_kind, args):
                 else:
                     actions[agent] = prey_action(prey_kind, agent_obs, rng)
             obs, rewards, terminateds, truncateds, _ = env.step(actions)
-            # Unshaped predator reward: predator_reward (10) per catch.
+            # Unshaped predator reward: predator_reward (10) per catch (summed
+            # over the repeated sub-steps).
             eaten += round(rewards.get("predator_0", 0.0) / 10)
             if terminateds.get("__all__") or truncateds.get("__all__"):
                 break
@@ -116,6 +118,7 @@ def main():
     parser.add_argument("--prey-count", type=int, default=4)
     parser.add_argument("--max-time-steps", type=int, default=200)
     parser.add_argument("--no-respawn", action="store_true")
+    parser.add_argument("--action-repeat", type=int, default=1)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     for predator_kind in ("sighted", "omniscient"):
