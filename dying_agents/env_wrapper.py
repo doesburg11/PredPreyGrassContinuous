@@ -10,9 +10,10 @@ registry under a fixed name so RLlib configs can reference it by string.
 
 import math
 import random
+from collections import deque
 
 import numpy as np
-from gymnasium.spaces import Box
+from gymnasium.spaces import Box, Dict
 from marl_aquarium import aquarium_v0
 from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
@@ -420,7 +421,10 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         predator_shaping: float = 0.0,
         shaping_gamma: float = 0.99,
         action_repeat: int = 1,
+        obs_stack: int = 1,
     ):
+        if obs_stack < 1:
+            raise ValueError(f"obs_stack must be >= 1, got {obs_stack}")
         if action_repeat < 1:
             raise ValueError(f"action_repeat must be >= 1, got {action_repeat}")
         if obs_mode not in OBS_MODES:
@@ -440,6 +444,39 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         self.shaping_gamma = shaping_gamma
         self.action_repeat = action_repeat
         self._potentials = {}
+        self.obs_stack = obs_stack
+        self._frames = {}
+        if obs_stack > 1:
+            spaces = {
+                agent: Box(
+                    low=np.tile(space.low, obs_stack),
+                    high=np.tile(space.high, obs_stack),
+                    dtype=np.float32,
+                )
+                for agent, space in self.observation_space.spaces.items()
+            }
+            self.observation_space = Dict(spaces)
+            self.observation_spaces = spaces
+
+    def _stack(self, obs, reset=False):
+        """Each agent's last obs_stack observations (one per decision),
+        oldest first, concatenated. A new episode starts with obs_stack
+        copies of its first observation (as gymnasium's FrameStack does)."""
+        if self.obs_stack == 1:
+            return obs
+        if reset:
+            self._frames = {}
+        stacked = {}
+        for agent, agent_obs in obs.items():
+            agent_obs = np.asarray(agent_obs, dtype=np.float32)
+            frames = self._frames.get(agent)
+            if frames is None:
+                frames = deque([agent_obs] * self.obs_stack, maxlen=self.obs_stack)
+                self._frames[agent] = frames
+            else:
+                frames.append(agent_obs)
+            stacked[agent] = np.concatenate(frames)
+        return stacked
 
     def _predator_potentials(self):
         """Phi(s) = -predator_shaping * (torus distance to the nearest prey)
@@ -466,10 +503,10 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         getattr(self.par_env.aec_env.unwrapped, "_pending_catches", []).clear()
         if seed is not None:
             random.seed(seed)
-        result = super().reset(seed=seed, options=options)
+        obs, infos = super().reset(seed=seed, options=options)
         if self.predator_shaping:
             self._potentials = self._predator_potentials()
-        return result
+        return self._stack(obs, reset=True), infos
 
     def _env_step(self, action_dict):
         obs, rewards, terminateds, truncateds, infos = super().step(action_dict)
@@ -519,7 +556,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             self._potentials = potentials
         if self.reward_scale != 1.0:
             rewards = {agent: r * self.reward_scale for agent, r in rewards.items()}
-        return obs, rewards, terminateds, truncateds, infos
+        return self._stack(obs), rewards, terminateds, truncateds, infos
 
     def close(self):
         try:
@@ -537,7 +574,8 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     (potential-based reward for predators closing in on the nearest prey,
     off by default; shaping_gamma should match PPO's gamma, 0.99),
     `action_repeat` (apply each action for N env steps, summing rewards;
-    default 1) and
+    default 1), `obs_stack` (give each agent its last N observations,
+    one per decision, as a crude memory; default 1) and
     `procreate` which is rejected: with
     it enabled, Aquarium creates prey IDs absent from the initial
     possible_agents/observation-space snapshot that ParallelPettingZooEnv
@@ -550,6 +588,7 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
     predator_shaping = env_config.pop("predator_shaping", 0.0)
     shaping_gamma = env_config.pop("shaping_gamma", 0.99)
     action_repeat = env_config.pop("action_repeat", 1)
+    obs_stack = env_config.pop("obs_stack", 1)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
         raise ValueError(
@@ -565,6 +604,7 @@ def make_env(env_config: dict) -> ParallelPettingZooEnv:
         predator_shaping=predator_shaping,
         shaping_gamma=shaping_gamma,
         action_repeat=action_repeat,
+        obs_stack=obs_stack,
     )
 
 

@@ -515,3 +515,78 @@ def test_action_repeat_shortens_episodes():
 def test_action_repeat_must_be_positive():
     with pytest.raises(ValueError, match="action_repeat"):
         make_env({"action_repeat": 0})
+
+
+# --- observation stacking ----------------------------------------------------
+
+
+def _stack_pair(stack, **env_config):
+    config = {
+        "predator_count": 1,
+        "prey_count": 4,
+        "max_time_steps": 200,
+        "render_mode": None,
+        "obs_mode": "egocentric",
+        "keep_prey_count_constant": False,
+    }
+    config.update(env_config)
+    return make_env({**config, "obs_stack": stack}), make_env(config)
+
+
+def test_obs_stack_space_and_reset_fill():
+    stacked, plain = _stack_pair(3)
+    random.seed(2)
+    obs_s, _ = stacked.reset()
+    random.seed(2)
+    obs_p, _ = plain.reset()
+    for agent, agent_obs in obs_p.items():
+        assert stacked.observation_space[agent].shape == (3 * EGO_SIZE,)
+        assert stacked.get_observation_space(agent).shape == (3 * EGO_SIZE,)
+        np.testing.assert_array_equal(obs_s[agent], np.tile(agent_obs, 3))
+
+
+def test_obs_stack_keeps_last_n_newest_last():
+    stacked, plain = _stack_pair(3)
+    random.seed(4)
+    stacked.reset()
+    random.seed(4)
+    obs_p, _ = plain.reset()
+    history = {agent: [np.asarray(o)] * 3 for agent, o in obs_p.items()}
+    rng = np.random.default_rng(4)
+    for _ in range(60):
+        actions = {agent: int(rng.integers(16)) for agent in plain.par_env.agents}
+        state = random.getstate()
+        obs_s, _, term_s, trunc_s, _ = stacked.step(actions)
+        random.setstate(state)
+        obs_p, _, term_p, trunc_p, _ = plain.step(actions)
+        assert set(obs_s) == set(obs_p)
+        for agent, agent_obs in obs_p.items():
+            history[agent] = history[agent][1:] + [np.asarray(agent_obs)]
+            np.testing.assert_allclose(
+                obs_s[agent], np.concatenate(history[agent]).astype(np.float32)
+            )
+            assert stacked.observation_space[agent].contains(obs_s[agent])
+        assert term_s == term_p and trunc_s == trunc_p
+        if term_p["__all__"] or trunc_p["__all__"]:
+            break
+
+
+def test_obs_stack_reset_clears_history():
+    stacked, _ = _stack_pair(2)
+    stacked.reset(seed=0)
+    stacked.step({agent: 3 for agent in stacked.par_env.agents})
+    obs, _ = stacked.reset(seed=1)
+    for agent_obs in obs.values():
+        half = len(agent_obs) // 2
+        np.testing.assert_array_equal(agent_obs[:half], agent_obs[half:])
+
+
+def test_obs_stack_one_is_a_no_op():
+    env = make_env({"obs_mode": "egocentric", "render_mode": None})
+    obs, _ = env.reset(seed=0)
+    assert all(np.asarray(o).shape == (EGO_SIZE,) for o in obs.values())
+
+
+def test_obs_stack_must_be_positive():
+    with pytest.raises(ValueError, match="obs_stack"):
+        make_env({"obs_stack": 0})

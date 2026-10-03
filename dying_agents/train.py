@@ -173,6 +173,13 @@ def build_parser():
         "decisions. Aquarium's predators turn slowly, so single-step "
         "actions barely change anything.",
     )
+    parser.add_argument(
+        "--obs-stack",
+        type=_positive_int,
+        default=1,
+        help="Give each agent its last N observations (one per decision, "
+        "oldest first) as a crude memory, e.g. 4. 1 (default) = off.",
+    )
     parser.add_argument("--iterations", type=_positive_int, default=5)
     parser.add_argument("--num-env-runners", type=int, default=16)
     parser.add_argument(
@@ -322,6 +329,7 @@ def main():
         "predator_shaping": args.predator_shaping,
         "shaping_gamma": args.gamma,
         "action_repeat": args.action_repeat,
+        "obs_stack": args.obs_stack,
     }
     if args.prey_fov is not None:
         env_config["prey_fov"] = args.prey_fov
