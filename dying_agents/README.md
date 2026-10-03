@@ -78,9 +78,9 @@ pip install moviepy==1.0.3
 
 (Swap the `torch` line for a CUDA wheel if you want GPU training, e.g.
 `pip install "torch==2.14.1+cu132" --index-url https://download.pytorch.org/whl/cu132`,
-then pass `train.py --num-gpus-per-learner 1`. With the default
-`--minibatch-size 128` the GPU is *slower* than the CPU (hundreds of tiny
-updates per iteration); it only pays off with larger minibatches, e.g. 1024.)
+then pass `train.py --num-gpus-per-learner 1`. Training now defaults to one GPU and minibatches of 1024. Tiny minibatches
+(e.g. 128) previously made the GPU slower than the CPU. For CPU-only runs,
+pass `--num-gpus-per-learner 0`.)
 
 ## Run
 
@@ -101,8 +101,8 @@ python eval.py --random --predator-count 1 --prey-count 4 --episodes 3
 Both modes were smoke-tested end to end (real `PPOConfig().build_algo()` +
 `.train()` calls, not just env reset/step) and produce a moving
 `episode_return_mean` across iterations — e.g. a 2-iteration PS run went from
--104.8 to -53.5. `--num-env-runners 0` (the default) runs everything inline for
-easy debugging; raise it for real training throughput.
+-104.8 to -53.5. `--num-env-runners 0 --num-gpus-per-learner 0` runs everything inline on CPU
+for debugging. The default now uses 16 remote environment runners and GPU learning.
 
 **Known upstream bug, worked around here**: Aquarium's own `env.close()` calls
 `sys.exit()` unconditionally (`marl_aquarium/env/aquarium.py:320` — apparently
@@ -131,3 +131,120 @@ The original paper only ever RL-trains prey (predator is a fixed `NaivChase`
 heuristic that isn't part of the published package). Aquarium's
 observation/action/reward interfaces are symmetric between predator and prey, so
 this port trains both by default — there's no structural reason not to.
+
+## Learning defaults
+
+Training now defaults to egocentric observations, reward scaling of 0.01,
+entropy coefficient 0.01, learning rate 3e-4, GAE lambda 0.95, 10 PPO epochs,
+separate actor/critic encoders, and gradient norm clipping at 0.5. These settings
+reduce the geometry the network must learn, keep death penalties manageable,
+and maintain exploration. They are starting points, not measured improvements
+in catch rate or survival; compare several seeds against the random baseline.
+All settings can be overridden on the command line.
+
+`--vf-clip-param` defaults to 1000: RLlib's new PPO learner caps **squared value
+error**, so its default of 10 can cut off critic gradients for a scaled death
+penalty of -10. The cap of 1000 gives that target additional headroom. Larger reward scales may require a larger cap.
+`--gamma` (default 0.99) applies per policy decision and is also passed to
+potential-based predator shaping. With action repeat, rewards are summed and
+shaping is applied once per decision; increasing repeat therefore changes the
+physical-time discount horizon. Predator shaping and action repeat remain
+opt-in, and prey still respawn unless `--no-respawn` is supplied.
+
+```bash
+# A longer run with dense predator feedback and permanent prey deaths:
+python train.py --mode ps --no-respawn --predator-shaping 1 \
+    --action-repeat 4 --iterations 100 --tensorboard-dir /tmp/aquarium-tb \
+    --checkpoint-dir /tmp/aquarium-ckpt
+python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 20 --render none
+```
+
+Evaluation reports unscaled, unshaped rewards. Inspect species-level returns
+and critic explained variance in TensorBoard; the combined episode return can
+hide improvements in one species and regressions in the other.
+
+## Resource defaults
+
+The local throughput benchmark selected 16 environment runners (one CPU each),
+one local GPU learner, a 4,800-step training batch, and minibatches of 1,024.
+The main process reserves one additional CPU. BLAS and PyTorch use one thread
+per process to avoid competing thread pools; Ray CPU allocations do not pin
+workers to physical cores. The script exposes its module directory to remote
+workers through PYTHONPATH, preserving existing entries.
+
+On the Ryzen 9 7950X / RTX 5070 Ti, this processed about 3,042 environment
+steps/second; 24 runners improved throughput by only 2%. This was a short
+permanent-death workload benchmark, not a universal optimum or a learning-quality
+comparison. GPU execution requires device access (outside Codex's restricted
+sandbox on this machine). Explicit CPU-only debugging remains available:
+
+```bash
+python train.py --num-env-runners 0 --num-gpus-per-learner 0
+```
+
+Thread limits are set before NumPy/PyTorch imports for command-line runs. The
+worker import-path setup targets a fresh local Ray instance started by this
+script; an existing or remote cluster needs its own runtime environment/package
+setup. RLlib uses cyclic minibatches: a non-divisible training batch wraps into
+the next pass rather than discarding the remainder or creating a short final
+minibatch. Species have different agent-sample counts, so divisibility of the
+environment-step batch alone would not make both species' batches divisible.
+
+## Measured network and training comparisons
+
+On the fixed-opponent, one-predator/four-prey, permanent-death experiments, the
+256×256 MLP was the best tested baseline. Smaller MLPs, the tested LSTM, and
+entity attention did not improve the overall result at the matched interaction
+budget. [Architecture results](../runs/architecture_comparison/RESULTS.md) and
+[attention results](../runs/architecture_comparison/ATTENTION_RESULTS.md) record
+all three seeds and limitations.
+
+A subsequent weights-only warm-start study gave each saved MLP 200 additional
+PPO iterations (960,000 new environment steps). Longer fixed-opponent predator
+training improved catches from 1.45 to 1.74 on common fresh starts and improved
+transfer to held-out heading prey. Mixing opponents gave similar primary catches
+but weaker transfer. Longer prey training reduced greedy survival from 86.1% to
+83.0% (fixed) or 79.0% (mixed); retaining the earlier prey checkpoints is preferable
+for that task. These results do not establish jointly evolving self-play behavior.
+[Study protocol and results](../runs/training_generalization/RESULTS.md) and
+[recommended module paths](../runs/training_generalization/recommended_models.json)
+are local experiment artifacts under `runs/`.
+
+The recommended predator/prey pairs were subsequently tested together on fresh
+starts. Improved predator catches increased in all three seed pairs: 1.11 to
+1.36 with greedy actions and 1.19 to 1.52 with stochastic actions. Retained prey
+survived 87.3% against the scripted searcher but 65.9% against the improved
+learned predator in greedy evaluation, exposing limited opponent transfer.
+[Joint matchup results](../runs/learned_matchups/RESULTS.md) include all seed
+pairs, source fingerprints and limitations. This is fixed-policy evaluation,
+not joint self-play training.
+
+A later prey-pool study trained against four frozen learned predators plus the
+searcher, holding out another predator lineage. Pool training improved survival
+against its held-out improved checkpoint from 55.7% to 72.0% greedy and 56.1% to
+61.7% stochastic across three prey seeds. Searcher survival fell from 83.7% to
+72.5% greedy, so original checkpoints remain preferable for searcher-focused use.
+[Prey-pool results](../runs/prey_predator_pool/RESULTS.md) and
+[scenario-specific module paths](../runs/prey_predator_pool/recommended_models.json)
+record the tradeoffs. These results cover one held-out predator lineage at two
+stages and do not establish ongoing self-play stability.
+
+## Run the recommended learned agents together
+
+From the repository root:
+
+```bash
+.conda/bin/python dying_agents/eval.py --recommended --episodes 3
+```
+
+This opens the simulation with the improved predator and pool-trained prey,
+using separate frozen CPU policies without starting Ray training workers.
+The environment matches the study: one predator, four prey, egocentric
+observations, and caught prey die permanently. Model seed 0 is the default;
+`--model-seed 1` or `--model-seed 2` selects the other trained pairs.
+The checkpoints under `runs/` must be present; they are local training artifacts.
+
+Use `--render none` for numeric output, `--render video` to save a video,
+and `--stochastic` to sample actions instead of choosing their maximum.
+`--seed 0` sets the first episode seed; subsequent episodes increment it.
+These are frozen learned behaviors; this command does not continue training.

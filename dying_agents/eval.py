@@ -5,12 +5,14 @@ train.py runs with render_mode=None (see env_wrapper.py) -- this script
 is the first place render_mode="rgb_array" actually gets used. With
 --checkpoint, it restores a full Algorithm from an RLlib checkpoint (see
 train.py --checkpoint-dir) and steps it greedily (argmax over each
-RLModule's action-dist logits -- no exploration). With --random, no
+RLModule's action-dist logits -- no exploration), or with --stochastic
+samples from those logits as training does. With --random, no
 checkpoint/RLlib Algorithm is involved at all -- every agent just samples
 its action space uniformly at random each step, as a baseline to compare
 trained behavior against.
 
 Usage:
+    python eval.py --recommended --episodes 3
     python train.py --checkpoint-dir /tmp/aquarium-ckpt --iterations 20
     python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 3
     python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 1 --render video
@@ -34,10 +36,13 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.core.columns import Columns
 
 from env_wrapper import make_env, register
+from learned_policies import SpeciesPolicies, recommended_paths, species_mapping
 
 
 @torch.inference_mode()
-def select_actions(algo: Algorithm, obs: dict, mapping_fn) -> dict:
+def select_actions(
+    algo: Algorithm, obs: dict, mapping_fn, stochastic: bool = False
+) -> dict:
     actions = {}
     for agent_id, agent_obs in obs.items():
         module = algo.get_module(mapping_fn(agent_id))
@@ -48,7 +53,12 @@ def select_actions(algo: Algorithm, obs: dict, mapping_fn) -> dict:
         ).unsqueeze(0)
         fwd_out = module.forward_inference({Columns.OBS: obs_batch})
         logits = fwd_out[Columns.ACTION_DIST_INPUTS]
-        actions[agent_id] = int(torch.argmax(logits[0]))
+        if stochastic:
+            # Sample like training does (a categorical over the logits).
+            dist = torch.distributions.Categorical(logits=logits[0])
+            actions[agent_id] = int(dist.sample())
+        else:
+            actions[agent_id] = int(torch.argmax(logits[0]))
     return actions
 
 
@@ -97,6 +107,13 @@ def main():
         "--checkpoint",
         help="RLlib checkpoint dir (from train.py --checkpoint-dir)",
     )
+    source.add_argument(
+        "--recommended",
+        action="store_true",
+        help="Run improved learned predator and pool-trained prey together",
+    )
+    parser.add_argument("--model-seed", type=int, choices=[0, 1, 2], default=0)
+    parser.add_argument("--seed", type=int, default=0, help="First episode seed")
     source.add_argument(
         "--random",
         action="store_true",
@@ -147,6 +164,12 @@ def main():
     )
     parser.add_argument("--episodes", type=_positive_int, default=1)
     parser.add_argument(
+        "--stochastic",
+        action="store_true",
+        help="With --checkpoint or --recommended, sample each action from the policy's "
+        "distribution (as during training) instead of taking the argmax.",
+    )
+    parser.add_argument(
         "--render", choices=["window", "video", "none"], default="window"
     )
     parser.add_argument(
@@ -159,7 +182,22 @@ def main():
     args = parser.parse_args()
 
     register()
-    if args.random:
+    policies = None
+    torch.set_num_threads(1)
+    torch.manual_seed(args.seed)
+    if args.recommended:
+        algo = None
+        policies = SpeciesPolicies(recommended_paths(args.model_seed))
+        mapping_fn = species_mapping
+        env_config = {
+            "predator_count": 1,
+            "prey_count": 4,
+            "max_time_steps": 200,
+            "obs_mode": "egocentric",
+            "keep_prey_count_constant": False,
+            "action_repeat": 1,
+        }
+    elif args.random:
         algo = None
         mapping_fn = None
         env_config = {
@@ -194,7 +232,7 @@ def main():
     summary = []  # (predator_return, prey_return, prey_eaten) per episode
     try:
         for episode in range(1, args.episodes + 1):
-            obs, _ = env.reset()
+            obs, _ = env.reset(seed=args.seed + episode - 1)
             frames = []
             episode_return = 0.0
             species_return = {"predator": 0.0, "prey": 0.0}
@@ -202,10 +240,14 @@ def main():
             steps = 0
             done = False
             while not done:
-                if algo is None:
+                if policies is not None:
+                    actions = select_actions(policies, obs, mapping_fn, args.stochastic)
+                elif algo is None:
                     actions = select_random_actions(env, obs)
                 else:
-                    actions = select_actions(algo, obs, mapping_fn)
+                    actions = select_actions(
+                        algo, obs, mapping_fn, stochastic=args.stochastic
+                    )
                 obs, rewards, terminateds, truncateds, _ = env.step(actions)
                 episode_return += sum(rewards.values())
                 for agent_id, reward in rewards.items():

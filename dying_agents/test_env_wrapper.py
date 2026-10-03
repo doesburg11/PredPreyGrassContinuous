@@ -382,8 +382,12 @@ def _paired_steps(shaped, plain, steps, seed):
 
 
 @pytest.mark.parametrize("respawn", [True, False])
-def test_shaping_step_adds_gamma_phi_difference_before_scaling(respawn):
-    common = {"keep_prey_count_constant": respawn, "reward_scale": 0.01}
+@pytest.mark.parametrize("repeat", [1, 4])
+def test_shaping_step_adds_gamma_phi_difference_before_scaling(respawn, repeat):
+    common = {
+        "keep_prey_count_constant": respawn, "reward_scale": 0.01,
+        "action_repeat": repeat, "max_time_steps": 2000,
+    }
     shaped = _shaping_env(predator_shaping=1.0, shaping_gamma=0.9, **common)
     plain = _shaping_env(**common)
     random.seed(5)
