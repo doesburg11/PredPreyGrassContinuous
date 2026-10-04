@@ -16,6 +16,10 @@ trained with RLlib's new API stack (RLModule + Learner).
 - [`add_energy/`](add_energy/) — `add_grass` plus metabolic energy: decay,
   food from grass and catches, starvation for both species, and an own-energy
   input. See its [README](add_energy/README.md).
+- [`add_reproduction/`](add_reproduction/) — `add_energy` plus births at an
+  energy threshold, populations that change during an episode, PredPreyGrass's
+  starting populations, and its sparse +10-per-birth reward. See its
+  [README](add_reproduction/README.md).
 
 All subprojects share one Conda environment at the repo root (`.conda/`).
 Training settings live in each module's `config/config_env.py` and

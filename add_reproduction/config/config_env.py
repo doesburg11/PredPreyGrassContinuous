@@ -1,0 +1,59 @@
+"""Environment settings. Edit this dictionary before running train.py."""
+
+config_env = {
+    # Initial populations (PredPreyGrass base_environment: 6 and 8).
+    "predator_count": 6,
+    "prey_count": 8,
+    "max_time_steps": 1000,
+    "render_mode": None,
+    "keep_prey_count_constant": False,  # Required: caught prey die permanently.
+    "obs_mode": "egocentric",  # Required for grass, energy, and reproduction.
+    # Rewards: PredPreyGrass's sparse scheme, +10 per birth and nothing else.
+    # Aquarium's own rewards and the grass food reward are switched off.
+    "reward_scale": 1.0,
+    "prey_reward": 0,  # Aquarium: reward per step alive.
+    "prey_punishment": 0,  # Aquarium: penalty when caught.
+    "predator_reward": 0,  # Aquarium: reward per catch.
+    "predator_shaping": 0.0,  # Potential-based shaping strength; 0 disables it.
+    "action_repeat": 1,
+    "obs_stack": 1,
+    "prey_fov": 240,  # view cone in degrees
+    "predator_fov": 150,
+    "prey_view_distance": 200,  # View cone radius in simulation units.
+    "predator_view_distance": 200,
+    # One 25x25 grid cell is ~32 units here, so PredPreyGrass's 100 grass
+    # cells become 100 patches.
+    "grass_count": 100,
+    "grass_consume_radius": 12.0,
+    "grass_food_reward": 0.0,  # Raw reward, before reward_scale.
+    "grass_respawn_delay": 400,  # Physics steps; patches regrow in place.
+    # Energy, in PredPreyGrass base_environment units. Its per-step rates are
+    # divided by 8: crossing this arena takes ~8x as many steps as its 25x25
+    # grid (800 units at 4-5 units/step vs 25 cells at 1 cell/step).
+    "energy_predator_initial": 5.0,
+    "energy_prey_initial": 3.0,
+    # PPG has no cap; these sit well above the reproduction thresholds and
+    # only scale the own-energy input (energy / max).
+    "energy_predator_max": 24.0,
+    "energy_prey_max": 16.0,
+    "energy_predator_decay": 0.15 / 8,  # Lost per physics step.
+    "energy_prey_decay": 0.05 / 8,
+    "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
+    "energy_catch_efficiency": 1.0,  # PPG: the predator gains all prey energy.
+    # Aquarium's own predator starvation clock (death after this many steps
+    # without a catch). Kept off so energy is the only way to starve.
+    "predator_max_age": 10**9,
+    # Reproduction (PredPreyGrass base_environment): at the threshold an
+    # animal has one offspring with the initial energy, paid by the parent.
+    "reproduction_predator_threshold": 12.0,
+    "reproduction_prey_threshold": 8.0,
+    "reproduction_predator_reward": 10.0,
+    "reproduction_prey_reward": 10.0,
+    # Population caps (Aquarium's observations scale with animals squared).
+    "reproduction_max_predators": 50,
+    "reproduction_max_prey": 100,
+    # Agent IDs per species, never reused within an episode; births stop
+    # when a pool runs out. PredPreyGrass uses 2000.
+    "reproduction_predator_pool": 2000,
+    "reproduction_prey_pool": 2000,
+}
