@@ -2,14 +2,14 @@
 
 from pathlib import Path
 
-# Use the existing runs directory inside dying_agents.
+# Use the existing runs directory inside dying_prey.
 RUNS_DIR = Path(__file__).resolve().parents[1] / "runs"
 
 # {run_name} becomes <module>_<Amsterdam timestamp> when training starts.
 # Set an output directory to None to disable that output.
 config_ppo = {
     "mode": "ps",  # "ps": policy per species; "il": policy per individual.
-    "iterations": 10000,  # Number of PPO training iterations.
+    "iterations": 1000,  # Number of PPO training iterations.
     "num_env_runners": 16,
     "num_learners": 0,
     "num_gpus_per_learner": 1,  # Set to 0 for CPU-only training.

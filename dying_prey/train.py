@@ -1,6 +1,6 @@
 """Train Aquarium agents using the environment and PPO configuration files.
 
-Run from the repository root: .conda/bin/python dying_agents/train.py
+Run from the repository root: .conda/bin/python dying_prey/train.py
 """
 
 import math
@@ -167,7 +167,7 @@ def main():
         os.environ[variable] = "1"
     torch.set_num_threads(1)
     # Remote workers must be able to import env_wrapper and mapping functions
-    # even when the script is launched from outside dying_agents/.
+    # even when the script is launched from outside dying_prey/.
     module_dir = str(Path(__file__).resolve().parent)
     python_path = os.environ.get("PYTHONPATH", "")
     os.environ["PYTHONPATH"] = os.pathsep.join(

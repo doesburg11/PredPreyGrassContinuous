@@ -1,6 +1,6 @@
 """Tests for the Aquarium vision patches in env_wrapper.py.
 
-Run from the repo root with `.conda/bin/python -m pytest dying_agents`.
+Run from the repo root with `.conda/bin/python -m pytest dying_prey`.
 """
 
 import math

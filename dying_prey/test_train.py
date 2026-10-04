@@ -22,7 +22,7 @@ def test_learning_defaults():
     assert args.grad_clip == 0.5
     assert not args.vf_share_layers
     assert args.vf_clip_param >= 10 * (1000 * env["reward_scale"]) ** 2
-    assert env["keep_prey_count_constant"]
+    assert not env["keep_prey_count_constant"]
 
 
 @pytest.mark.parametrize("value", [0, -1, math.nan, math.inf, True])
@@ -186,5 +186,5 @@ def test_output_paths_share_module_name_and_timestamp(monkeypatch, tmp_path):
     tensorboard = Path(settings.tensorboard_dir)
     assert checkpoint.parent == tensorboard.parent
     assert checkpoint.parent.parent == tmp_path
-    assert re.fullmatch(r"dying_agents_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}", checkpoint.parent.name)
+    assert re.fullmatch(r"dying_prey_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}", checkpoint.parent.name)
     assert "{run_name}" in train.config_ppo["checkpoint_dir"]

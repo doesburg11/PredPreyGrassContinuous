@@ -14,7 +14,7 @@ Prey policies:
 - random: uniform random actions (trained prey behave close to this);
 - flee:   run directly away from the predator when it's in view, else random.
 
-Usage (from dying_agents/):
+Usage (from dying_prey/):
 
     python scripted_eval.py --episodes 100
     python scripted_eval.py --episodes 100 --no-respawn

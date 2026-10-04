@@ -62,7 +62,7 @@ ray's dependencies to satisfy Aquarium's stale pins. The one real exception is
 that one genuinely needs the pinned `moviepy==1.0.3`.
 
 ```bash
-# Run from dying_agents/ (the directory containing train.py).
+# Run from dying_prey/ (the directory containing train.py).
 conda create --prefix ../.conda python=3.11 pip -y
 conda activate ../.conda
 pip install "ray[rllib]==2.58.0" torch --extra-index-url https://download.pytorch.org/whl/cpu
@@ -80,8 +80,8 @@ Edit `config/config_env.py` for population, episode length, observations,
 reward scaling, shaping, action repeat, and respawning. Edit
 `config/config_ppo.py` for PPO hyperparameters, resources, iterations, and output
 paths. The current run configuration uses 2,500 training iterations. Checkpoints and
-TensorBoard logs are saved under the existing `dying_agents/runs/`
-in a shared `dying_agents_<timestamp>` directory. The timestamp uses Amsterdam
+TensorBoard logs are saved under the existing `dying_prey/runs/`
+in a shared `dying_prey_<timestamp>` directory. The timestamp uses Amsterdam
 time and includes microseconds. `{run_name}` in either output path is replaced
 when training starts; set a path to `None` to disable that output.
 Periodic checkpoints are saved every 10 iterations.
@@ -89,7 +89,7 @@ Periodic checkpoints are saved every 10 iterations.
 From the repository root:
 
 ```bash
-.conda/bin/python dying_agents/train.py
+.conda/bin/python dying_prey/train.py
 ```
 
 For example, configure a longer permanent-death run by editing the dictionaries:
@@ -109,8 +109,8 @@ For example, configure a longer permanent-death run by editing the dictionaries:
 Then train with the same command and evaluate the saved checkpoint:
 
 ```bash
-.conda/bin/python dying_agents/eval.py --checkpoint runs/my_training/checkpoint --episodes 3
-.conda/bin/python dying_agents/eval.py --random --predator-count 1 --prey-count 4 --episodes 3
+.conda/bin/python dying_prey/eval.py --checkpoint runs/my_training/checkpoint --episodes 3
+.conda/bin/python dying_prey/eval.py --random --predator-count 1 --prey-count 4 --episodes 3
 ```
 
 Evaluation retains its command-line options. Both training modes were previously
@@ -237,7 +237,7 @@ stages and do not establish ongoing self-play stability.
 From the repository root:
 
 ```bash
-.conda/bin/python dying_agents/eval.py --recommended --episodes 3
+.conda/bin/python dying_prey/eval.py --recommended --episodes 3
 ```
 
 This opens the simulation with the improved predator and pool-trained prey,
