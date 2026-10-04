@@ -21,17 +21,27 @@ Training defaults to 1,000 iterations. Outputs are saved in
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `energy_predator_initial` | 100 | Predator energy at reset |
-| `energy_prey_initial` | 50 | Prey energy at reset |
-| `energy_predator_max` | 200 | Predator energy cap |
-| `energy_prey_max` | 100 | Prey energy cap |
-| `energy_predator_decay` | 0.15 | Predator energy lost per physics step |
-| `energy_prey_decay` | 0.1 | Prey energy lost per physics step |
-| `energy_grass_gain` | 20 | Prey energy per grass patch eaten |
+| `energy_predator_initial` | 5.0 | Predator energy at reset |
+| `energy_prey_initial` | 3.0 | Prey energy at reset |
+| `energy_predator_max` | 12.0 | Predator energy cap |
+| `energy_prey_max` | 8.0 | Prey energy cap |
+| `energy_predator_decay` | 0.15 / 8 | Predator energy lost per physics step |
+| `energy_prey_decay` | 0.05 / 8 | Prey energy lost per physics step |
+| `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
 | `energy_catch_efficiency` | 1.0 | Share of a caught prey's energy its catcher gains |
+| `predator_max_age` | 10^9 | Aquarium's own starvation clock, kept off |
 
-These defaults have not been tuned. Without food, a prey starves after 500
-steps and a predator after about 667 steps.
+The defaults use the energy units of PredPreyGrass's discrete
+`base_environment`. That environment has initial energies 5 and 3, full grass
+at 2.0, and predators that gain all of a caught prey's energy. Its per-step
+rates are divided by 8, because crossing this 800-unit arena at 4 to 5 units
+per step takes about 8 times as many steps as crossing its 25x25 grid.
+Predator decay 0.15 becomes 0.01875, and prey decay 0.05 becomes 0.00625.
+Grass that regrows 0.04 per step (full after 50 steps) becomes a patch that
+returns after 400 steps (`grass_respawn_delay`). PredPreyGrass has no energy
+cap, but reproduction at 12 (predator) and 8 (prey) drains energy. The caps
+use those thresholds until reproduction is added. Without food, a predator
+starves after 267 steps and a prey after 480 steps.
 
 Each step, energy is updated after Aquarium's movement and catches and after
 grass is eaten:
@@ -47,7 +57,7 @@ terminated, with `infos[agent]["starved"] = True`. The episode ends once no
 predators or no prey are left. If the prey are gone, every agent is
 terminated. If the predators are gone, the surviving prey are truncated.
 Aquarium's own predator starvation clock (`predator_max_age`) is disabled
-whenever energy is configured. Energy requires grass settings and
+whenever energy is configured, unless the config sets it. Energy requires grass settings and
 `keep_prey_count_constant = False`.
 
 Every agent gets one extra observation input at the end: its own energy as a
@@ -62,7 +72,7 @@ reports the raw value. The viewer draws an energy bar above each animal.
 | `grass_count` | 24 | Number of stationary patches; 0 disables grass |
 | `grass_consume_radius` | 12 | Toroidal distance within which prey eat a patch |
 | `grass_food_reward` | 10 | Reward per patch, before global reward scaling |
-| `grass_respawn_delay` | 100 | Physics steps before a consumed patch regrows |
+| `grass_respawn_delay` | 400 | Physics steps before a consumed patch regrows |
 
 Consumption is checked after movement and predator captures. Dead prey cannot
 consume grass. Each available patch rewards the closest living prey within its

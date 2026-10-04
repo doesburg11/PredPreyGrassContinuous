@@ -27,13 +27,13 @@ class EnergyLayer:
 
     def __init__(
         self,
-        predator_initial=100.0,
-        prey_initial=50.0,
-        predator_max=200.0,
-        prey_max=100.0,
-        predator_decay=0.15,
-        prey_decay=0.1,
-        grass_gain=20.0,
+        predator_initial=5.0,
+        prey_initial=3.0,
+        predator_max=12.0,
+        prey_max=8.0,
+        predator_decay=0.15 / 8,
+        prey_decay=0.05 / 8,
+        grass_gain=2.0,
         catch_efficiency=1.0,
     ):
         settings = {

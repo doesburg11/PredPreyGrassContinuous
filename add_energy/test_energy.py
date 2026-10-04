@@ -112,6 +112,30 @@ def test_catch_feeds_the_catching_predator(env):
     assert predator.energy == pytest.approx(100 + 0.5 * 40 - 1)
 
 
+def test_simultaneous_catches_feed_their_own_catchers():
+    env = make_env({**BASE, "predator_count": 2, "prey_count": 3})
+    try:
+        obs, _ = env.reset(seed=0)
+        raw = env.par_env.aec_env.unwrapped
+        first, second = raw.predators
+        near_second, near_first, bystander = raw.prey
+        for entity, x in zip((first, second, bystander), (100, 400, 700)):
+            entity.position = Vector(x, 400)
+        for entity in raw.predators + raw.prey:
+            entity.velocity = Vector(0, 0)
+        # Different energies so a swapped or misattributed catch shows.
+        near_second.energy, near_first.energy = 40.0, 10.0
+        near_second.position = second.position.copy()
+        near_first.position = first.position.copy()
+        _, _, terms, _, _ = env.step(idle(env, obs))
+        assert terms[near_second.id()] and terms[near_first.id()]
+        assert first.energy == pytest.approx(100 + 0.5 * 10 - 1)
+        assert second.energy == pytest.approx(100 + 0.5 * 40 - 1)
+        assert bystander.energy == pytest.approx(50 - 0.5)
+    finally:
+        env.close()
+
+
 def test_prey_starvation_terminates_only_that_prey(env):
     obs, raw = setup(env)
     hungry, other = raw.prey
