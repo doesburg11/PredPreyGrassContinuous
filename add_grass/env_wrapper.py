@@ -451,14 +451,14 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         self.obs_stack = obs_stack
         self._frames = {}
         if obs_stack > 1:
-            spaces = {
-                agent: Box(
+            spaces: dict = {}
+            for agent, space in self.observation_space.spaces.items():
+                assert isinstance(space, Box)
+                spaces[agent] = Box(
                     low=np.tile(space.low, obs_stack),
                     high=np.tile(space.high, obs_stack),
                     dtype=np.float32,
                 )
-                for agent, space in self.observation_space.spaces.items()
-            }
             self.observation_space = Dict(spaces)
             self.observation_spaces = spaces
 
