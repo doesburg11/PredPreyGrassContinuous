@@ -3,7 +3,7 @@
 A continuous-space counterpart to the grid-based
 [PredPreyGrass](https://github.com/doesburg11/PredPreyGrass), built on Aquarium.
 There is no grass layer yet: so far it adds agents that die for good
-(`--no-respawn`) on top of the Aquarium port described below.
+(`config_env["keep_prey_count_constant"] = False`) on top of the Aquarium port described below.
 
 Runs [Aquarium](https://github.com/michaelkoelle/marl-aquarium) (Kölle, Erpelding,
 Ritz, Phan, Illium & Linnhoff-Popien, 2024) — a PettingZoo-native, physics-based
@@ -28,17 +28,12 @@ not an extension of the reproduction research itself.
   registry via RLlib's built-in `ParallelPettingZooEnv` wrapper. No custom
   `MultiAgentEnv` subclass was needed: Aquarium is already a
   `ParallelEnv[str, Box, Discrete]`, which `ParallelPettingZooEnv` handles directly.
-- `train.py` — PPO training script on the new API stack, with two modes that
-  mirror the original paper's two conditions but extended to *both* species
-  (the paper only ever trained prey, against a fixed heuristic predator):
-  - `--mode il`: independent learning, one policy per individual agent
-    (`predator_0`, `prey_0`, `prey_1`, ...).
-  - `--mode ps`: parameter sharing, one shared policy per species
-    (`predator_policy`, `prey_policy`).
-  - `--checkpoint-dir <dir>` saves an RLlib checkpoint after training, for use
-    with `eval.py`. Add `--checkpoint-every N` to also save one every N
-    iterations, to `<dir>/iter_<NNNNNN>`.
-- `eval.py` — rolls out either a checkpoint from `train.py --checkpoint-dir`
+- `train.py` — PPO training on RLlib's new API stack, configured entirely in
+  `config/config_env.py` and `config/config_ppo.py`. No training CLI arguments.
+  Set `config_ppo["mode"]` to `"il"` for one policy per individual, or `"ps"`
+  for one shared policy per species. Set `checkpoint_dir` to save a final
+  checkpoint and `checkpoint_every` to save periodic checkpoints too.
+- `eval.py` — rolls out either a checkpoint from training with `checkpoint_dir` configured
   (greedily: argmax over each policy's action logits, no exploration) or, with
   `--random`, a uniform-random baseline with no RLlib/checkpoint involved at
   all -- visualized either way with Aquarium's own `pygame` renderer:
@@ -76,33 +71,51 @@ pip install "pettingzoo==1.24.2" "pygame==2.6.1"
 pip install moviepy==1.0.3
 ```
 
-(Swap the `torch` line for a CUDA wheel if you want GPU training, e.g.
-`pip install "torch==2.14.1+cu132" --index-url https://download.pytorch.org/whl/cu132`,
-then pass `train.py --num-gpus-per-learner 1`. Training now defaults to one GPU and minibatches of 1024. Tiny minibatches
-(e.g. 128) previously made the GPU slower than the CPU. For CPU-only runs,
-pass `--num-gpus-per-learner 0`.)
+Use a CUDA-enabled PyTorch build for GPU training. Training defaults to one
+GPU; set `config_ppo["num_gpus_per_learner"] = 0` for CPU-only runs.
 
 ## Run
 
+Edit `config/config_env.py` for population, episode length, observations,
+reward scaling, shaping, action repeat, and respawning. Edit
+`config/config_ppo.py` for PPO hyperparameters, resources, iterations, and output
+paths. The current run configuration uses 2,500 training iterations. Checkpoints and
+TensorBoard logs are saved under `/home/doesburg/simulation_results/ray_results/`
+in a shared `dying_agents_<timestamp>` directory. The timestamp uses Amsterdam
+time and includes microseconds. `{run_name}` in either output path is replaced
+when training starts; set a path to `None` to disable that output.
+Periodic checkpoints are saved every 10 iterations.
+
+From the repository root:
+
 ```bash
-python train.py --mode ps --predator-count 1 --prey-count 4 --iterations 5
-python train.py --mode il --predator-count 1 --prey-count 4 --iterations 5
-
-# Train with a checkpoint, then watch/record the trained agents:
-python train.py --mode ps --predator-count 1 --prey-count 4 --iterations 20 \
-    --checkpoint-dir /tmp/aquarium-ckpt
-python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 3
-python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 1 --render video
-
-# Or watch a uniform-random baseline, no checkpoint needed:
-python eval.py --random --predator-count 1 --prey-count 4 --episodes 3
+.conda/bin/python dying_agents/train.py
 ```
 
-Both modes were smoke-tested end to end (real `PPOConfig().build_algo()` +
-`.train()` calls, not just env reset/step) and produce a moving
-`episode_return_mean` across iterations — e.g. a 2-iteration PS run went from
--104.8 to -53.5. `--num-env-runners 0 --num-gpus-per-learner 0` runs everything inline on CPU
-for debugging. The default now uses 16 remote environment runners and GPU learning.
+For example, configure a longer permanent-death run by editing the dictionaries:
+
+```python
+# config/config_env.py
+"keep_prey_count_constant": False,
+"predator_shaping": 1.0,
+"action_repeat": 4,
+
+# config/config_ppo.py
+"iterations": 100,
+"tensorboard_dir": "runs/my_training/tensorboard",
+"checkpoint_dir": "runs/my_training/checkpoint",
+```
+
+Then train with the same command and evaluate the saved checkpoint:
+
+```bash
+.conda/bin/python dying_agents/eval.py --checkpoint runs/my_training/checkpoint --episodes 3
+.conda/bin/python dying_agents/eval.py --random --predator-count 1 --prey-count 4 --episodes 3
+```
+
+Evaluation retains its command-line options. Both training modes were previously
+smoke-tested end to end. For inline CPU debugging, set both `num_env_runners`
+and `num_gpus_per_learner` to 0 in `config/config_ppo.py`.
 
 **Known upstream bug, worked around here**: Aquarium's own `env.close()` calls
 `sys.exit()` unconditionally (`marl_aquarium/env/aquarium.py:320` — apparently
@@ -112,7 +125,7 @@ shutdown, so the `SystemExit` could kill the calling thread/process mid-cleanup.
 `SafeParallelPettingZooEnv.close()` in `env_wrapper.py` catches it. Also fixed
 per that review: `procreate=True` is now explicitly rejected (see docstring in
 `make_env()` — it would create prey agent IDs the wrapper/policies can't
-enumerate ahead of time), CLI population/step/iteration counts must be positive,
+enumerate ahead of time), configured population/step/iteration counts must be positive,
 and the PS `policy_mapping_fn` raises on an unrecognized agent-id prefix instead
 of silently treating it as prey.
 
@@ -140,24 +153,16 @@ separate actor/critic encoders, and gradient norm clipping at 0.5. These setting
 reduce the geometry the network must learn, keep death penalties manageable,
 and maintain exploration. They are starting points, not measured improvements
 in catch rate or survival; compare several seeds against the random baseline.
-All settings can be overridden on the command line.
+All settings can be edited in the two configuration files.
 
-`--vf-clip-param` defaults to 1000: RLlib's new PPO learner caps **squared value
+`vf_clip_param` defaults to 1000: RLlib's new PPO learner caps **squared value
 error**, so its default of 10 can cut off critic gradients for a scaled death
 penalty of -10. The cap of 1000 gives that target additional headroom. Larger reward scales may require a larger cap.
-`--gamma` (default 0.99) applies per policy decision and is also passed to
+`gamma` (default 0.99) applies per policy decision and is also passed to
 potential-based predator shaping. With action repeat, rewards are summed and
 shaping is applied once per decision; increasing repeat therefore changes the
 physical-time discount horizon. Predator shaping and action repeat remain
-opt-in, and prey still respawn unless `--no-respawn` is supplied.
-
-```bash
-# A longer run with dense predator feedback and permanent prey deaths:
-python train.py --mode ps --no-respawn --predator-shaping 1 \
-    --action-repeat 4 --iterations 100 --tensorboard-dir /tmp/aquarium-tb \
-    --checkpoint-dir /tmp/aquarium-ckpt
-python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 20 --render none
-```
+opt-in, and prey still respawn unless `keep_prey_count_constant` is set to `False`.
 
 Evaluation reports unscaled, unshaped rewards. Inspect species-level returns
 and critic explained variance in TensorBoard; the combined episode return can
@@ -178,9 +183,7 @@ permanent-death workload benchmark, not a universal optimum or a learning-qualit
 comparison. GPU execution requires device access (outside Codex's restricted
 sandbox on this machine). Explicit CPU-only debugging remains available:
 
-```bash
-python train.py --num-env-runners 0 --num-gpus-per-learner 0
-```
+Set `num_env_runners = 0` and `num_gpus_per_learner = 0` in the PPO dictionary.
 
 Thread limits are set before NumPy/PyTorch imports for command-line runs. The
 worker import-path setup targets a fresh local Ray instance started by this

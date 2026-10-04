@@ -1,0 +1,30 @@
+"""PPO hyperparameters, resources, and run settings. Edit before training."""
+
+# {run_name} becomes <module>_<Amsterdam timestamp> when training starts.
+# Set an output directory to None to disable that output.
+config_ppo = {
+    "mode": "ps",  # "ps": policy per species; "il": policy per individual.
+    "iterations": 2500,  # Number of PPO training iterations.
+    "num_env_runners": 16,
+    "num_learners": 0,
+    "num_gpus_per_learner": 1,  # Set to 0 for CPU-only training.
+    "train_batch_size": 4800,
+    "minibatch_size": 1024,
+    "num_epochs": 10,
+    "lr": 3e-4,
+    "gae_lambda": 0.95,
+    "gamma": 0.99,  # Per decision; also used for environment reward shaping.
+    "entropy_coeff": 0.01,
+    "vf_share_layers": False,
+    "grad_clip": 0.5,  # None disables gradient clipping.
+    "vf_clip_param": 1000.0,  # Squared value-error cap for scaled death penalties.
+    "tensorboard_dir": (
+        "/home/doesburg/simulation_results/ray_results/"
+        "{run_name}/tensorboard"
+    ),
+    "checkpoint_dir": (
+        "/home/doesburg/simulation_results/ray_results/"
+        "{run_name}/checkpoint"
+    ),
+    "checkpoint_every": 10,  # Requires checkpoint_dir; 0 saves only at the end.
+}

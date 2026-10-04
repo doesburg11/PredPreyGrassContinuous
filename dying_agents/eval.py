@@ -175,6 +175,14 @@ def main():
     parser.add_argument(
         "--out-dir", default="videos", help="Where --render video saves mp4s"
     )
+    parser.add_argument(
+        "--fps",
+        type=_positive_int,
+        default=60,
+        help="Frame rate of --render video mp4s. Frames are captured once per "
+        "decision, so with action repeat lower it (e.g. 10) to keep the "
+        "video watchable.",
+    )
     parser.add_argument("--draw-view-cones", action="store_true")
     parser.add_argument("--draw-force-vectors", action="store_true")
     parser.add_argument("--draw-hit-boxes", action="store_true")
@@ -291,7 +299,7 @@ def main():
                 )
             )
             if args.render == "video" and frames:
-                save_video(frames, args.out_dir, episode)
+                save_video(frames, args.out_dir, episode, fps=args.fps)
         n = len(summary)
         if n:
             pred, prey, eaten = (sum(col) / n for col in zip(*summary))
