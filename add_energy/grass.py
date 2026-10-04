@@ -125,6 +125,16 @@ class GrassLayer:
         )
 
 
+def ensure_view(raw_env):
+    """Create Aquarium's pygame view now, as its render() would, so a layer
+    can hook the view's draw methods before the first frame is drawn."""
+    if raw_env.view is None:
+        from marl_aquarium.env.view import View
+
+        raw_env.view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
+    return raw_env.view
+
+
 def patch_grass(raw_env, **settings):
     """Attach food to one Aquarium instance before RLlib snapshots its spaces.
 
@@ -201,13 +211,7 @@ def patch_grass(raw_env, **settings):
     def render(mode=None):
         # Aquarium draws background then animals in one call; hook the view's
         # draw_background so grass lands between them, under the animals.
-        if raw_env.view is None:
-            from marl_aquarium.env.view import View
-
-            raw_env.view = View(
-                raw_env.width, raw_env.height, raw_env.caption, raw_env.fps
-            )
-        view = raw_env.view
+        view = ensure_view(raw_env)
         nonlocal hooked_view
         if view is not hooked_view:
             draw_background = view.draw_background

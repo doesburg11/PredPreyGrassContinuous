@@ -13,6 +13,9 @@ trained with RLlib's new API stack (RLModule + Learner).
 - [`add_grass/`](add_grass/) — a contained experiment adding stationary grass,
   food rewards, delayed regrowth, and nearest-visible-grass inputs for prey.
   See its [README](add_grass/README.md).
+- [`add_energy/`](add_energy/) — `add_grass` plus metabolic energy: decay,
+  food from grass and catches, starvation for both species, and an own-energy
+  input. See its [README](add_energy/README.md).
 
 All subprojects share one Conda environment at the repo root (`.conda/`).
 Training settings live in each module's `config/config_env.py` and
