@@ -84,6 +84,24 @@ rewards. Aquarium's own rewards and the grass food reward are set to 0 in
 Restoring the earlier values gives the denser rewards of `add_energy`, for
 comparison.
 
+## Time scale
+
+One PredPreyGrass grid step moves an animal one cell. Here, one cell
+corresponds to about 32 units, and an animal covering that at 4 to 5 units per
+step takes about 8 physics steps. The defaults use that factor throughout:
+
+- `action_repeat = 8`: each decision is applied for 8 physics steps, so one
+  decision equals one PredPreyGrass step. PPO's `gamma` (0.99 per decision)
+  then discounts per grid step, as in PredPreyGrass.
+- `max_time_steps = 8000` physics steps: an episode lasts about 1000
+  decisions, matching PredPreyGrass's 1000-step episodes.
+- The energy rates and the grass regrowth delay are rescaled by 8 (see
+  Energy settings).
+
+A sub-step with a birth ends its decision early, so some decisions are
+shorter. With `--render video`, frames are captured once per decision, so use
+a low `--fps` (for example 8) for real-time playback.
+
 ## Populations and grass
 
 Episodes start with 6 predators and 8 prey, as in PredPreyGrass. One 25x25

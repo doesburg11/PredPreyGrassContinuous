@@ -4,7 +4,11 @@ config_env = {
     # Initial populations (PredPreyGrass base_environment: 6 and 8).
     "predator_count": 6,
     "prey_count": 8,
-    "max_time_steps": 1000,
+    # Time scale. One PredPreyGrass grid step (1 cell, ~32 units here) takes
+    # ~8 physics steps at 4-5 units/step, which is why the energy rates below
+    # are divided by 8. Its 1000-step episodes therefore last 8000 physics
+    # steps here. max_time_steps counts physics steps.
+    "max_time_steps": 8000,
     "render_mode": None,
     "keep_prey_count_constant": False,  # Required: caught prey die permanently.
     "obs_mode": "egocentric",  # Required for grass, energy, and reproduction.
@@ -15,7 +19,11 @@ config_env = {
     "prey_punishment": 0,  # Aquarium: penalty when caught.
     "predator_reward": 0,  # Aquarium: reward per catch.
     "predator_shaping": 0.0,  # Potential-based shaping strength; 0 disables it.
-    "action_repeat": 1,
+    # Each decision is applied for 8 physics steps, so one decision equals one
+    # PredPreyGrass step: ~1000 decisions per episode, and gamma (0.99 per
+    # decision in config_ppo.py) discounts per grid step as PredPreyGrass
+    # does. A sub-step with a birth ends its decision early (see README).
+    "action_repeat": 8,
     "obs_stack": 1,
     "prey_fov": 240,  # view cone in degrees
     "predator_fov": 150,
