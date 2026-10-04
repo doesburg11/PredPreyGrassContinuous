@@ -1,10 +1,15 @@
 """PPO hyperparameters, resources, and run settings. Edit before training."""
 
+from pathlib import Path
+
+# Use the existing runs directory inside dying_agents.
+RUNS_DIR = Path(__file__).resolve().parents[1] / "runs"
+
 # {run_name} becomes <module>_<Amsterdam timestamp> when training starts.
 # Set an output directory to None to disable that output.
 config_ppo = {
     "mode": "ps",  # "ps": policy per species; "il": policy per individual.
-    "iterations": 2500,  # Number of PPO training iterations.
+    "iterations": 10000,  # Number of PPO training iterations.
     "num_env_runners": 16,
     "num_learners": 0,
     "num_gpus_per_learner": 1,  # Set to 0 for CPU-only training.
@@ -18,13 +23,7 @@ config_ppo = {
     "vf_share_layers": False,
     "grad_clip": 0.5,  # None disables gradient clipping.
     "vf_clip_param": 1000.0,  # Squared value-error cap for scaled death penalties.
-    "tensorboard_dir": (
-        "/home/doesburg/simulation_results/ray_results/"
-        "{run_name}/tensorboard"
-    ),
-    "checkpoint_dir": (
-        "/home/doesburg/simulation_results/ray_results/"
-        "{run_name}/checkpoint"
-    ),
+    "tensorboard_dir": str(RUNS_DIR / "{run_name}" / "tensorboard"),
+    "checkpoint_dir": str(RUNS_DIR / "{run_name}" / "checkpoint"),
     "checkpoint_every": 10,  # Requires checkpoint_dir; 0 saves only at the end.
 }

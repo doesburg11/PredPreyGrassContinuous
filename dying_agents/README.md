@@ -80,7 +80,7 @@ Edit `config/config_env.py` for population, episode length, observations,
 reward scaling, shaping, action repeat, and respawning. Edit
 `config/config_ppo.py` for PPO hyperparameters, resources, iterations, and output
 paths. The current run configuration uses 2,500 training iterations. Checkpoints and
-TensorBoard logs are saved under `/home/doesburg/simulation_results/ray_results/`
+TensorBoard logs are saved under the existing `dying_agents/runs/`
 in a shared `dying_agents_<timestamp>` directory. The timestamp uses Amsterdam
 time and includes microseconds. `{run_name}` in either output path is replaced
 when training starts; set a path to `None` to disable that output.

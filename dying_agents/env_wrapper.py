@@ -413,6 +413,8 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
        to catch, so report it as a termination instead.
     """
 
+    observation_space: Dict
+
     def __init__(
         self,
         env,
@@ -565,7 +567,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             pass
 
 
-def make_env(env_config: dict) -> ParallelPettingZooEnv:
+def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
     """env_config keys are passed straight through to
     aquarium_v0.parallel_env(), except `reward_scale` (multiplies every reward,
     default 1.0; PPO's value-loss clipping copes badly with Aquarium's -1000

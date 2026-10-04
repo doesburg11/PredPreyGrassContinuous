@@ -1,4 +1,4 @@
-"""Train Aquarium agents using settings in config/config_env.py and config/config_ppo.py.
+"""Train Aquarium agents using the environment and PPO configuration files.
 
 Run from the repository root: .conda/bin/python dying_agents/train.py
 """
@@ -8,9 +8,9 @@ import os
 import sys
 import time
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 from config.config_env import config_env
 from config.config_ppo import config_ppo
@@ -79,7 +79,16 @@ def load_settings():
     env = dict(config_env)
     ppo = dict(config_ppo)
     for settings, names in (
-        (env, ("predator_count", "prey_count", "max_time_steps", "action_repeat", "obs_stack")),
+        (
+            env,
+            (
+                "predator_count",
+                "prey_count",
+                "max_time_steps",
+                "action_repeat",
+                "obs_stack",
+            ),
+        ),
         (ppo, ("iterations", "train_batch_size", "minibatch_size", "num_epochs")),
     ):
         for name in names:
@@ -90,40 +99,62 @@ def load_settings():
         if type(ppo[name]) is not int or ppo[name] < 0:
             raise ValueError(f"{name} must be a nonnegative integer")
     for settings, name, positive in (
-        (env, "reward_scale", True), (env, "predator_shaping", False),
-        (ppo, "lr", True), (ppo, "vf_clip_param", True),
-        (ppo, "entropy_coeff", False), (ppo, "num_gpus_per_learner", False),
+        (env, "reward_scale", True),
+        (env, "predator_shaping", False),
+        (ppo, "lr", True),
+        (ppo, "vf_clip_param", True),
+        (ppo, "entropy_coeff", False),
+        (ppo, "num_gpus_per_learner", False),
         (ppo, "grad_clip", True),
     ):
         value = settings[name]
         if name == "grad_clip" and value is None:
             continue
-        if (isinstance(value, bool) or not isinstance(value, (int, float))
-                or not math.isfinite(value) or value < 0 or (positive and value == 0)):
-            raise ValueError(f"{name} must be finite and {'positive' if positive else 'nonnegative'}")
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+            or (positive and value == 0)
+        ):
+            raise ValueError(
+                f"{name} must be finite and {'positive' if positive else 'nonnegative'}"
+            )
     for name in ("gamma", "gae_lambda"):
         value = ppo[name]
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not 0 <= value <= 1
+        ):
             raise ValueError(f"{name} must be finite and in [0, 1]")
     for name in ("prey_fov", "predator_fov"):
         if name in env and (type(env[name]) is not int or not 0 < env[name] <= 360):
             raise ValueError(f"{name} must be an integer in (0, 360]")
     if env["obs_mode"] not in ("aquarium", "egocentric"):
         raise ValueError("obs_mode must be aquarium or egocentric")
-    if type(env["keep_prey_count_constant"]) is not bool or type(ppo["vf_share_layers"]) is not bool:
-        raise ValueError("keep_prey_count_constant and vf_share_layers must be booleans")
+    if (
+        type(env["keep_prey_count_constant"]) is not bool
+        or type(ppo["vf_share_layers"]) is not bool
+    ):
+        raise ValueError(
+            "keep_prey_count_constant and vf_share_layers must be booleans"
+        )
     if ppo["mode"] not in ("il", "ps"):
         raise ValueError("mode must be il or ps")
     if ppo["checkpoint_every"] and not ppo["checkpoint_dir"]:
         raise ValueError("checkpoint_every requires checkpoint_dir")
     module_name = Path(__file__).resolve().parent.name
-    timestamp = datetime.now(ZoneInfo("Europe/Amsterdam")).strftime("%Y-%m-%d_%H-%M-%S_%f")
+    timestamp = datetime.now(ZoneInfo("Europe/Amsterdam")).strftime(
+        "%Y-%m-%d_%H-%M-%S_%f"
+    )
     run_name = f"{module_name}_{timestamp}"
     for name in ("checkpoint_dir", "tensorboard_dir"):
         if ppo[name]:
-            ppo[name] = os.path.abspath(os.path.expanduser(
-                os.fspath(ppo[name]).replace("{run_name}", run_name)
-            ))
+            ppo[name] = os.path.abspath(
+                os.path.expanduser(os.fspath(ppo[name]).replace("{run_name}", run_name))
+            )
     env["shaping_gamma"] = ppo["gamma"]
     return env, SimpleNamespace(**ppo)
 
@@ -229,5 +260,8 @@ def main():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        raise SystemExit("Training takes no command-line arguments. Edit config/config_env.py and config/config_ppo.py.")
+        raise SystemExit(
+            "Training takes no command-line arguments. "
+            "Edit config/config_env.py and config/config_ppo.py."
+        )
     main()
