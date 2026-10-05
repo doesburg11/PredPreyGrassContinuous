@@ -132,10 +132,12 @@ def load_settings():
     for name in ("prey_fov", "predator_fov"):
         if name in env and (type(env[name]) is not int or not 0 < env[name] <= 360):
             raise ValueError(f"{name} must be an integer in (0, 360]")
-    if env["obs_mode"] not in ("aquarium", "egocentric"):
+    # Both are optional: make_env defaults them to what grass and energy
+    # require (egocentric observations, permanent prey deaths).
+    if env.get("obs_mode", "egocentric") not in ("aquarium", "egocentric"):
         raise ValueError("obs_mode must be aquarium or egocentric")
     if (
-        type(env["keep_prey_count_constant"]) is not bool
+        type(env.get("keep_prey_count_constant", False)) is not bool
         or type(ppo["vf_share_layers"]) is not bool
     ):
         raise ValueError(

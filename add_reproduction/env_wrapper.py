@@ -627,29 +627,35 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
 
 def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
     """env_config keys are passed straight through to
-    aquarium_v0.parallel_env(), except `reward_scale` (multiplies every reward,
-    default 1.0; PPO's value-loss clipping copes badly with Aquarium's -1000
-    prey punishment), `obs_mode` ("aquarium", the default, or "egocentric";
-    see _patch_egocentric_obs), `predator_shaping` / `shaping_gamma`
-    (potential-based reward for predators closing in on the nearest prey,
-    off by default; shaping_gamma should match PPO's gamma, 0.99),
-    `action_repeat` (apply each action for N env steps, summing rewards;
-    default 1), `obs_stack` (give each agent its last N observations,
-    one per decision, as a crude memory; default 1) and
-    `grass_*` settings (stationary renewable food and prey-only observation
-    inputs; see grass.py), `energy_*` settings (decay, food, starvation and
-    an own-energy input for both species; see energy.py), `reproduction_*`
-    settings (energy-threshold births with a fixed agent ID pool; see
-    reproduction.py), and `procreate` (Aquarium's own births) which is
-    rejected: with
-    it enabled, Aquarium creates prey IDs absent from the initial
-    possible_agents/observation-space snapshot that ParallelPettingZooEnv
-    takes at construction time, and train.py's IL mode has no policy for an
-    agent ID it can't enumerate ahead of time. Not supported here.
+    aquarium_v0.parallel_env(), except:
+
+    - `reward_scale`: multiplies every reward (default 1.0; PPO's value-loss
+      clipping copes badly with Aquarium's -1000 prey punishment);
+    - `obs_mode`: "aquarium" or "egocentric" (see _patch_egocentric_obs).
+      Defaults to "egocentric" when grass is configured, which requires it,
+      and to "aquarium" otherwise;
+    - `predator_shaping` / `shaping_gamma`: potential-based reward for
+      predators closing in on the nearest prey, off by default;
+      shaping_gamma should match PPO's gamma, 0.99;
+    - `action_repeat`: apply each action for N env steps, summing rewards
+      (default 1);
+    - `obs_stack`: give each agent its last N observations, one per
+      decision, as a crude memory (default 1);
+    - `grass_*` settings: stationary renewable food and prey-only
+      observation inputs (see grass.py);
+    - `energy_*` settings: decay, food, starvation and an own-energy input
+      for both species (see energy.py);
+    - `reproduction_*` settings: energy-threshold births with a fixed agent
+      ID pool (see reproduction.py);
+    - `procreate` (Aquarium's own births), which is rejected: with it
+      enabled, Aquarium creates prey IDs absent from the initial
+      possible_agents/observation-space snapshot that ParallelPettingZooEnv
+      takes at construction time, and train.py's IL mode has no policy for
+      an agent ID it can't enumerate ahead of time.
     """
     env_config = dict(env_config or {})
     reward_scale = env_config.pop("reward_scale", 1.0)
-    obs_mode = env_config.pop("obs_mode", "aquarium")
+    obs_mode = env_config.pop("obs_mode", None)
     predator_shaping = env_config.pop("predator_shaping", 0.0)
     shaping_gamma = env_config.pop("shaping_gamma", 0.99)
     action_repeat = env_config.pop("action_repeat", 1)
@@ -687,6 +693,10 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         # Aquarium's own starvation clock (death after predator_max_age steps
         # without a catch) would compete with energy; turn it off.
         env_config.setdefault("predator_max_age", 10**9)
+        # Energy needs permanent deaths: Aquarium's default respawns prey.
+        env_config.setdefault("keep_prey_count_constant", False)
+    if obs_mode is None:
+        obs_mode = "egocentric" if grass_config is not None else "aquarium"
     reproduction_keys = (
         "reproduction_predator_threshold",
         "reproduction_prey_threshold",

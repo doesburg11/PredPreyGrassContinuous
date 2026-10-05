@@ -14,7 +14,7 @@ repository root:
 .conda/bin/python add_reproduction/train.py
 ```
 
-Training defaults to 1,000 iterations. Outputs are saved in
+Training defaults to 10,000 iterations. Outputs are saved in
 `add_reproduction/runs/add_reproduction_<Amsterdam timestamp>/`. Training must
 use `mode = "ps"` (one policy per species). `il` mode is rejected because a
 policy per individual needs every agent ID in advance, and newborns get IDs

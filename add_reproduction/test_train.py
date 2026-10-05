@@ -14,7 +14,8 @@ def test_learning_defaults():
     assert args.num_gpus_per_learner == 1
     assert args.train_batch_size == 4800
     assert args.minibatch_size == 1024
-    assert env["obs_mode"] == "egocentric"
+    # Fixed by grass/energy, so make_env sets them (see test below).
+    assert "obs_mode" not in env and "keep_prey_count_constant" not in env
     assert env["reward_scale"] == 1.0
     assert args.entropy_coeff == 0.01
     assert args.lr == 3e-4
@@ -28,7 +29,6 @@ def test_learning_defaults():
     assert env["reproduction_predator_reward"] == 10.0
     assert env["reproduction_prey_reward"] == 10.0
     assert args.mode == "ps"
-    assert not env["keep_prey_count_constant"]
 
 
 @pytest.mark.parametrize("value", [0, -1, math.nan, math.inf, True])
@@ -46,7 +46,9 @@ def test_discount_validation(monkeypatch, name, value):
         train.load_settings()
 
 
-@pytest.mark.parametrize("name", ["num_env_runners", "num_learners", "checkpoint_every"])
+@pytest.mark.parametrize(
+    "name", ["num_env_runners", "num_learners", "checkpoint_every"]
+)
 def test_resource_counts_reject_negative_values(monkeypatch, name):
     monkeypatch.setitem(train.config_ppo, name, -1)
     with pytest.raises(ValueError, match=name):
@@ -88,7 +90,12 @@ def test_cpu_only_override(monkeypatch):
 
 
 def test_file_settings_reach_ppo_and_environment(monkeypatch):
-    for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "PYTHONPATH"):
+    for variable in (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "PYTHONPATH",
+    ):
         monkeypatch.setenv(variable, "original")
     thread_limits = []
     monkeypatch.setattr(train.torch, "set_num_threads", thread_limits.append)
@@ -117,7 +124,6 @@ def test_file_settings_reach_ppo_and_environment(monkeypatch):
     assert config.gamma == config.env_config["shaping_gamma"] == 0.9
     assert config.env_config["reward_scale"] == 0.02
     assert config.env_config["predator_shaping"] == 1
-    assert config.env_config["obs_mode"] == "egocentric"
     assert not config.env_config["keep_prey_count_constant"]
     assert config.env_config["prey_fov"] == 360
     assert set(config.policies) == {"predator_policy", "prey_policy"}
@@ -132,9 +138,12 @@ def test_file_settings_reach_ppo_and_environment(monkeypatch):
     assert config.train_batch_size_per_learner == 4800
     assert config.minibatch_size == 1024
     import os
+
     for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         assert os.environ[variable] == "1"
-    assert os.environ["PYTHONPATH"].split(os.pathsep)[0] == str(Path(train.__file__).parent)
+    assert os.environ["PYTHONPATH"].split(os.pathsep)[0] == str(
+        Path(train.__file__).parent
+    )
 
 
 def test_training_iterations_checkpoints_and_logging(monkeypatch, tmp_path):
@@ -169,30 +178,52 @@ def test_training_iterations_checkpoints_and_logging(monkeypatch, tmp_path):
     monkeypatch.setattr(train, "SummaryWriter", FakeWriter)
     monkeypatch.setattr(train, "register", lambda: None)
     monkeypatch.setattr(train.torch, "set_num_threads", lambda n: None)
-    for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "PYTHONPATH"):
+    for name in (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "PYTHONPATH",
+    ):
         monkeypatch.setenv(name, "original")
-    for key, value in {"iterations": 3, "checkpoint_every": 2,
-                       "checkpoint_dir": checkpoint, "tensorboard_dir": "tb"}.items():
+    for key, value in {
+        "iterations": 3,
+        "checkpoint_every": 2,
+        "checkpoint_dir": checkpoint,
+        "tensorboard_dir": "tb",
+    }.items():
         monkeypatch.setitem(train.config_ppo, key, value)
     train.main()
     assert events.count("train") == 3
-    assert [event for event in events if isinstance(event, tuple) and event[0] == "save"] == [
-        ("save", str(tmp_path / "checkpoint" / "iter_000002")), ("save", checkpoint)
-    ]
-    assert [event[-1] for event in events if isinstance(event, tuple) and event[0] == "scalar"] == [1, 2, 3]
+    assert [
+        event for event in events if isinstance(event, tuple) and event[0] == "save"
+    ] == [("save", str(tmp_path / "checkpoint" / "iter_000002")), ("save", checkpoint)]
+    assert [
+        event[-1]
+        for event in events
+        if isinstance(event, tuple) and event[0] == "scalar"
+    ] == [1, 2, 3]
     assert events[-2:] == ["close_writer", "stop"]
 
 
 def test_output_paths_share_module_name_and_timestamp(monkeypatch, tmp_path):
     import re
-    for key, folder in (("checkpoint_dir", "checkpoint"), ("tensorboard_dir", "tensorboard")):
-        monkeypatch.setitem(train.config_ppo, key, str(tmp_path / "{run_name}" / folder))
+
+    for key, folder in (
+        ("checkpoint_dir", "checkpoint"),
+        ("tensorboard_dir", "tensorboard"),
+    ):
+        monkeypatch.setitem(
+            train.config_ppo, key, str(tmp_path / "{run_name}" / folder)
+        )
     _, settings = train.load_settings()
     checkpoint = Path(settings.checkpoint_dir)
     tensorboard = Path(settings.tensorboard_dir)
     assert checkpoint.parent == tensorboard.parent
     assert checkpoint.parent.parent == tmp_path
-    assert re.fullmatch(r"add_reproduction_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}", checkpoint.parent.name)
+    assert re.fullmatch(
+        r"add_reproduction_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}",
+        checkpoint.parent.name,
+    )
     assert "{run_name}" in train.config_ppo["checkpoint_dir"]
 
 
@@ -200,3 +231,17 @@ def test_individual_policies_are_rejected_with_reproduction(monkeypatch):
     monkeypatch.setitem(train.config_ppo, "mode", "il")
     with pytest.raises(ValueError, match="il"):
         train.load_settings()
+
+
+def test_make_env_fills_in_required_obs_mode_and_permanent_deaths():
+    from env_wrapper import make_env
+
+    env_config, _ = train.load_settings()
+    env = make_env(env_config)
+    try:
+        raw = env.par_env.aec_env.unwrapped
+        assert raw.keep_prey_count_constant is False
+        assert raw._egocentric_obs_patched
+        assert env.get_observation_space("prey_0").shape == (33,)
+    finally:
+        env.close()

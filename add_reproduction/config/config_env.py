@@ -10,8 +10,6 @@ config_env = {
     # steps here. max_time_steps counts physics steps.
     "max_time_steps": 8000,
     "render_mode": None,
-    "keep_prey_count_constant": False,  # Required: caught prey die permanently.
-    "obs_mode": "egocentric",  # Required for grass, energy, and reproduction.
     # Rewards: PredPreyGrass's sparse scheme, +10 per birth and nothing else.
     # Aquarium's own rewards and the grass food reward are switched off.
     "reward_scale": 1.0,
@@ -25,6 +23,14 @@ config_env = {
     # does. A sub-step with a birth ends its decision early (see README).
     "action_repeat": 8,
     "obs_stack": 1,
+    # Movement (Aquarium's defaults). Speeds are in units per physics step;
+    # the energy time scale assumes ~4-5 (one ~32-unit grid cell per ~8 steps).
+    "predator_max_velocity": 5,  # Top speed.
+    "prey_max_velocity": 4,
+    "predator_max_acceleration": 0.6,  # Speed gained per step.
+    "prey_max_acceleration": 1,
+    "predator_max_steer_force": 0.6,  # How sharply it can turn.
+    "prey_max_steer_force": 0.6,
     "prey_fov": 240,  # view cone in degrees
     "predator_fov": 150,
     "prey_view_distance": 200,  # View cone radius in simulation units.
