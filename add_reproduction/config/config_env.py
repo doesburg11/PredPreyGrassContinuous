@@ -10,8 +10,9 @@ config_env = {
     # steps here. max_time_steps counts physics steps.
     "max_time_steps": 8000,
     "render_mode": None,
-    # Viewer window: "fit" scales the 800x800 arena up to fit the screen,
-    # an int is the window side in pixels, None draws 1:1. Display only.
+    # Viewer window: "fit" scales the 800x800 arena up to fit the screen, an
+    # int is the arena's side in pixels, None draws 1:1 without the predator/
+    # prey time series shown right of the arena. Display only.
     "render_window_size": "fit",
     # Rewards: PredPreyGrass's sparse scheme, +10 per birth and nothing else.
     # Aquarium's own rewards and the grass food reward are switched off.

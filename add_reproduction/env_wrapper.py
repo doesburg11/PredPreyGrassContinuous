@@ -386,8 +386,9 @@ def _patch_egocentric_obs(raw_env) -> int:
 def _patch_scaled_view(raw_env, window_size) -> None:
     """Show the Aquarium window larger than the arena, without changing the
     simulation: Aquarium draws onto an arena-sized canvas (grass.ensure_view)
-    and every rendered frame is scaled into the window (grass.show_view).
-    window_size is "fit" (fit the screen) or the window's longer side in
+    and every rendered frame is scaled into the window (grass.show_view),
+    with a predator/prey population time series to the right of the arena.
+    window_size is "fit" (fit the screen) or the arena's longer side in
     pixels. rgb_array frames then have the window's size."""
     from grass import ensure_view, show_view
 

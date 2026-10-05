@@ -390,12 +390,16 @@ def test_render_window_scales_the_picture_not_the_arena(monkeypatch, size):
     try:
         obs, raw = setup(env)
         frame = env.par_env.render()
-        if size == 1000:
-            assert frame.shape == (1000, 1000, 3)
+        # frame is (width, height, 3). A scaled window adds an equally wide
+        # population panel; "fit" has no desktop to fit under the dummy driver.
+        expected = {None: (800, 800), 1000: (2000, 1000), "fit": (1600, 800)}
+        assert frame.shape == (*expected[size], 3)
+        if size is not None:
             assert raw.view.screen.get_size() == (800, 800)  # drawn 1:1
-        else:
-            # None draws 1:1; "fit" has no desktop size under the dummy driver.
-            assert frame.shape == (800, 800, 3)
+            panel = frame[expected[size][1] :]
+            # Predator and prey lines are drawn in the panel.
+            for color in ((200, 60, 50), (150, 100, 40)):
+                assert (panel == np.array(color)).all(axis=-1).sum() > 0
         assert (raw.width, raw.height) == (800, 800)
         # Energy bars are drawn and scaled with the rest of the frame.
         green = (frame == np.array([40, 170, 60])).all(axis=-1).sum()
@@ -424,3 +428,21 @@ def test_window_is_placed_through_sdl_env_var_not_a_window_object(monkeypatch):
     monkeypatch.setenv("SDL_VIDEO_WINDOW_POS", "5,5")  # a user's own choice wins
     place_window((0, 0, 2560, 1020), (980, 980))
     assert os.environ["SDL_VIDEO_WINDOW_POS"] == "5,5"
+
+
+def test_population_lines_use_each_species_color():
+    import pygame
+
+    from grass import PREDATOR_COLOR, PREY_COLOR, draw_population
+
+    pygame.init()
+    surface = pygame.Surface((400, 400))
+    # 2 predators throughout, prey climbing to 9: prey must be the higher line.
+    history = [(0, 2, 1), (500, 2, 9), (1000, 2, 9)]
+    draw_population(pygame, surface, history, 1000)
+    pixels = pygame.surfarray.array3d(surface)  # (x, y, 3)
+
+    def mean_row(color):
+        return np.argwhere((pixels == np.array(color)).all(axis=-1))[:, 1].mean()
+
+    assert mean_row(PREY_COLOR) < mean_row(PREDATOR_COLOR)  # smaller y is higher

@@ -133,9 +133,10 @@ def ensure_view(raw_env):
     can hook the view's draw methods before the first frame is drawn.
 
     With raw_env.window_size set (see env_wrapper._patch_scaled_view),
-    Aquarium draws at one pixel per arena unit onto an off-screen canvas,
-    show_view scales each finished frame into the window, and the window is
-    placed at the top of the screen, centred horizontally."""
+    Aquarium draws at one pixel per arena unit onto an off-screen canvas, and
+    show_view scales each finished frame into the left of the window, with a
+    population time series to its right. The window is placed at the top of
+    the screen, centred horizontally."""
     if raw_env.view is None:
         import pygame
         from marl_aquarium.env.view import View
@@ -143,15 +144,42 @@ def ensure_view(raw_env):
         pygame.init()
         headless = pygame.display.get_driver() in ("dummy", "offscreen")
         area = None if headless else work_area(pygame)  # before any window
-        size = window_size(raw_env, area)
-        if area is not None and getattr(raw_env, "window_size", None) is not None:
-            place_window(area, size)
+        scaled = getattr(raw_env, "window_size", None) is not None
+        arena_px = window_size(raw_env, area)
+        panel = arena_px[0] if scaled else 0  # time series as wide as the arena
+        total = (arena_px[0] + panel, arena_px[1])
+        if area is not None and scaled:
+            place_window(area, total)
         view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
-        if size != (raw_env.width, raw_env.height):
-            raw_env.window = pygame.display.set_mode(size)
+        view.shark_image = sprite_for_radius(
+            pygame, view.shark_image, raw_env.predator_radius
+        )
+        view.fish_image = sprite_for_radius(
+            pygame, view.fish_image, raw_env.prey_radius
+        )
+        if scaled:
+            raw_env.window = pygame.display.set_mode(total)
+            raw_env.arena_px = arena_px
+            raw_env.population = []  # (physics step, predators, prey)
             view.screen = pygame.Surface((raw_env.width, raw_env.height))
         raw_env.view = view
     return raw_env.view
+
+
+SPRITE_PER_DIAMETER = 1.25  # Sprite size relative to the body diameter.
+MIN_SPRITE = 36  # Arena units; keeps small animals recognizable.
+
+
+def sprite_for_radius(pygame, image, radius):
+    """Aquarium's animal image, cropped to its visible part and scaled so its
+    longer side is SPRITE_PER_DIAMETER body diameters (at least MIN_SPRITE
+    arena units): close to the body that catches and collides, yet large
+    enough to tell a predator from a prey. Display only."""
+    image = image.subsurface(image.get_bounding_rect(min_alpha=1))
+    target = max(SPRITE_PER_DIAMETER * 2 * radius, MIN_SPRITE)
+    scale = target / max(image.get_size())
+    size = (max(1, round(image.get_width() * scale)), round(image.get_height() * scale))
+    return pygame.transform.smoothscale(image, (size[0], max(1, size[1])))
 
 
 def work_area(pygame):
@@ -180,17 +208,18 @@ def work_area(pygame):
 
 
 def window_size(raw_env, area):
-    """The window size for raw_env.window_size: "fit" is the largest size
-    that fits the work area below a title bar, an int is the window's longer
-    side in pixels, and None keeps Aquarium's 1:1 window. The arena's aspect
-    ratio is kept. "fit" without a screen (headless) also keeps 1:1."""
+    """The arena's size on screen for raw_env.window_size: "fit" is the
+    largest size that fits the work area below a title bar, with room beside
+    it for an equally wide time series; an int is the arena's longer side in
+    pixels; None keeps Aquarium's 1:1 window. The arena's aspect ratio is
+    kept. "fit" without a screen (headless) also keeps 1:1."""
     setting = getattr(raw_env, "window_size", None)
     arena = (raw_env.width, raw_env.height)
     if setting is None or (setting == "fit" and area is None):
         return arena
     if setting == "fit":
         _, _, width, height = area
-        scale = min(width / arena[0], (height - TITLE_BAR) / arena[1])
+        scale = min(width / (2 * arena[0]), (height - TITLE_BAR) / arena[1])
     else:
         scale = setting / max(arena)
     return (round(arena[0] * scale), round(arena[1] * scale))
@@ -213,16 +242,85 @@ def place_window(area, size):
 
 
 def show_view(raw_env):
-    """Scale the finished canvas into the window and display it. Returns the
+    """Scale the finished canvas into the left of the window, draw the
+    population time series to its right, and display it. Returns the
     window's pixels as Aquarium's get_frame does, (width, height, 3)."""
     import pygame
 
     window = getattr(raw_env, "window", None)
     if window is None:
         return None
-    pygame.transform.smoothscale(raw_env.view.screen, window.get_size(), window)
+    width, height = raw_env.arena_px
+    arena = window.subsurface((0, 0, width, height))
+    pygame.transform.smoothscale(raw_env.view.screen, (width, height), arena)
+    history = raw_env.population
+    if history and raw_env.time_step < history[-1][0]:
+        history.clear()  # a new episode
+    history.append((raw_env.time_step, len(raw_env.predators), len(raw_env.prey)))
+    panel = window.subsurface((width, 0, window.get_width() - width, height))
+    draw_population(pygame, panel, history, raw_env.max_time_steps)
     pygame.display.update()
     return pygame.surfarray.array3d(window)
+
+
+PREDATOR_COLOR = (200, 60, 50)
+PREY_COLOR = (150, 100, 40)
+
+
+def draw_population(pygame, surface, history, max_steps):
+    """Predator and prey counts over the episode: physics steps 0 to
+    max_steps on the x axis, animals on the y axis."""
+    width, height = surface.get_size()
+    surface.fill((250, 250, 248))
+    if width < 100:
+        return
+    font = pygame.font.Font(None, max(16, height // 40))
+    title = pygame.font.Font(None, max(20, height // 28))
+    ink, grid = (60, 60, 60), (225, 225, 220)
+    left, right = int(width * 0.11), int(width * 0.04)
+    top, bottom = int(height * 0.09), int(height * 0.08)
+    plot_w, plot_h = width - left - right, height - top - bottom
+    peak = max([1] + [max(pred, prey) for _, pred, prey in history])
+    y_max = next(m for m in (10, 20, 25, 40, 50, 75, 100, 150, 200, 500) if m >= peak)
+    y_max = max(y_max, peak)
+
+    def to_xy(step, count):
+        x = left + plot_w * min(step, max_steps) / max_steps
+        return x, top + plot_h * (1 - count / y_max)
+
+    for i in range(6):  # gridlines and axis labels
+        count = y_max * i / 5
+        _, y = to_xy(0, count)
+        pygame.draw.line(surface, grid, (left, y), (left + plot_w, y))
+        label = font.render(f"{count:g}", True, ink)
+        surface.blit(label, (left - label.get_width() - 6, y - label.get_height() / 2))
+        step = max_steps * i / 5
+        x, _ = to_xy(step, 0)
+        label = font.render(f"{step:g}", True, ink)
+        surface.blit(label, (x - label.get_width() / 2, top + plot_h + 6))
+    pygame.draw.rect(surface, ink, (left, top, plot_w, plot_h), 1)
+    for index, color in (
+        (1, PREDATOR_COLOR),
+        (2, PREY_COLOR),
+    ):  # rows: step, pred, prey
+        points = [to_xy(row[0], row[index]) for row in history]
+        if len(points) > 1:
+            pygame.draw.lines(surface, color, False, points, 3)
+    pred, prey = (history[-1][1], history[-1][2]) if history else (0, 0)
+    surface.blit(title.render("Population", True, ink), (left, top * 0.3))
+    legend_x = left + plot_w
+    for text, color in (
+        (f"prey {prey}", PREY_COLOR),
+        (f"predators {pred}", PREDATOR_COLOR),
+    ):
+        label = font.render(text, True, color)
+        legend_x -= label.get_width()
+        surface.blit(label, (legend_x, top * 0.45))
+        legend_x -= 24
+    caption = font.render("physics step", True, ink)
+    surface.blit(
+        caption, (left + plot_w / 2 - caption.get_width() / 2, height - bottom * 0.45)
+    )
 
 
 def patch_grass(raw_env, **settings):
@@ -304,10 +402,12 @@ def patch_grass(raw_env, **settings):
         view = ensure_view(raw_env)
         nonlocal hooked_view
         if view is not hooked_view:
-            draw_background = view.draw_background
 
             def draw_background_and_grass():
-                draw_background()
+                # Aquarium's draw_background, without its FPS counter in the
+                # top-left corner: clear the frame and keep the frame rate.
+                view.screen.blit(view.background, (0, 0))
+                view.clock.tick(view.fps)
                 draw_grass()
 
             view.draw_background = draw_background_and_grass
