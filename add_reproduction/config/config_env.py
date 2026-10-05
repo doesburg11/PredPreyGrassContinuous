@@ -26,17 +26,18 @@ config_env = {
     # does. A sub-step with a birth ends its decision early (see README).
     "action_repeat": 8,
     "obs_stack": 1,
-    # Movement (Aquarium's defaults). Speeds are in units per physics step;
+    # Movement. Prey speed raised to the predators' 5, as in PredPreyGrass.
+    # Speeds are in units per physics step;
     # the energy time scale assumes ~4-5 (one ~32-unit grid cell per ~8 steps).
     "predator_max_velocity": 5,  # Top speed.
-    "prey_max_velocity": 4,
+    "prey_max_velocity": 5,
     "predator_max_acceleration": 0.6,  # Speed gained per step.
     "prey_max_acceleration": 1,
     "predator_max_steer_force": 0.6,  # How sharply it can turn.
     "prey_max_steer_force": 0.6,
     "prey_fov": 240,  # view cone in degrees
     "predator_fov": 150,
-    "prey_view_distance": 200,  # View cone radius in simulation units.
+    "prey_view_distance": 267,  # View cone radius in simulation units.
     "predator_view_distance": 200,
     # One 25x25 grid cell is ~32 units here, so PredPreyGrass's 100 grass
     # cells become 100 patches.

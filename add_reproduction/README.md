@@ -14,7 +14,7 @@ repository root:
 .conda/bin/python add_reproduction/train.py
 ```
 
-Training defaults to 10,000 iterations. Outputs are saved in
+Training defaults to 1,000 iterations. Outputs are saved in
 `add_reproduction/runs/add_reproduction_<Amsterdam timestamp>/`. Training must
 use `mode = "ps"` (one policy per species). `il` mode is rejected because a
 policy per individual needs every agent ID in advance, and newborns get IDs
@@ -101,6 +101,17 @@ step takes about 8 physics steps. The defaults use that factor throughout:
 A sub-step with a birth ends its decision early, so some decisions are
 shorter. With `--render video`, frames are captured once per decision, so use
 a low `--fps` (for example 8) for real-time playback.
+
+## Balance between predators and prey
+
+As in PredPreyGrass, prey are as fast as predators and see farther. Both
+species have a top speed of 5 units per step (`prey_max_velocity`,
+`predator_max_velocity`). Prey see 267 units and predators see 200
+(`prey_view_distance`, `predator_view_distance`), which keeps PredPreyGrass's
+4:3 ratio between a 9x9 prey view and a 7x7 predator view. With Aquarium's
+default prey speed of 4 and equal views, trained predators drove the prey
+extinct in about 36 decisions. With these settings, episodes last about 90
+decisions at the same training stage.
 
 ## Populations and grass
 
