@@ -381,3 +381,31 @@ def test_newborn_observation_is_stacked():
         assert env.get_observation_space("prey_2").contains(newborn)
     finally:
         env.close()
+
+
+@pytest.mark.parametrize("size", [None, 1000, "fit"])
+def test_render_window_scales_the_picture_not_the_arena(monkeypatch, size):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    env = make(render_mode="rgb_array", render_window_size=size)
+    try:
+        obs, raw = setup(env)
+        frame = env.par_env.render()
+        if size == 1000:
+            assert frame.shape == (1000, 1000, 3)
+            assert raw.view.screen.get_size() == (800, 800)  # drawn 1:1
+        else:
+            # None draws 1:1; "fit" has no desktop size under the dummy driver.
+            assert frame.shape == (800, 800, 3)
+        assert (raw.width, raw.height) == (800, 800)
+        # Energy bars are drawn and scaled with the rest of the frame.
+        green = (frame == np.array([40, 170, 60])).all(axis=-1).sum()
+        assert green > 0
+        env.step(act(obs))
+        assert env.par_env.render().shape == frame.shape
+    finally:
+        env.close()
+
+
+def test_render_window_size_is_validated():
+    with pytest.raises(ValueError, match="render_window_size"):
+        make(render_window_size="big")

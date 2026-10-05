@@ -125,14 +125,100 @@ class GrassLayer:
         )
 
 
+TITLE_BAR = 40  # Room left for the window's title bar, in pixels.
+
+
 def ensure_view(raw_env):
     """Create Aquarium's pygame view now, as its render() would, so a layer
-    can hook the view's draw methods before the first frame is drawn."""
+    can hook the view's draw methods before the first frame is drawn.
+
+    With raw_env.window_size set (see env_wrapper._patch_scaled_view),
+    Aquarium draws at one pixel per arena unit onto an off-screen canvas,
+    show_view scales each finished frame into the window, and the window is
+    placed at the top of the screen, centred horizontally."""
     if raw_env.view is None:
+        import pygame
         from marl_aquarium.env.view import View
 
-        raw_env.view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
+        pygame.init()
+        headless = pygame.display.get_driver() in ("dummy", "offscreen")
+        area = None if headless else work_area(pygame)  # before any window
+        view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
+        size = window_size(raw_env, area)
+        if size != (raw_env.width, raw_env.height):
+            raw_env.window = pygame.display.set_mode(size)
+            view.screen = pygame.Surface((raw_env.width, raw_env.height))
+        if area is not None and getattr(raw_env, "window_size", None) is not None:
+            place_window(pygame, area, size)
+        raw_env.view = view
     return raw_env.view
+
+
+def work_area(pygame):
+    """The screen area not taken by panels or task bars, as (x, y, width,
+    height): the window manager's _NET_WORKAREA on X11, else the desktop
+    minus a typical task bar."""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["xprop", "-root", "_NET_WORKAREA"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        ).stdout
+        x, y, width, height = (int(v) for v in out.split("=")[1].split(",")[:4])
+        if width > 0 and height > 0:
+            return x, y, width, height
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        pass
+    desktop = pygame.display.Info()
+    if desktop.current_w <= 0 or desktop.current_h <= 0:
+        return None
+    return 0, 0, desktop.current_w, desktop.current_h - 60
+
+
+def window_size(raw_env, area):
+    """The window size for raw_env.window_size: "fit" is the largest size
+    that fits the work area below a title bar, an int is the window's longer
+    side in pixels, and None keeps Aquarium's 1:1 window. The arena's aspect
+    ratio is kept. "fit" without a screen (headless) also keeps 1:1."""
+    setting = getattr(raw_env, "window_size", None)
+    arena = (raw_env.width, raw_env.height)
+    if setting is None or (setting == "fit" and area is None):
+        return arena
+    if setting == "fit":
+        _, _, width, height = area
+        scale = min(width / arena[0], (height - TITLE_BAR) / arena[1])
+    else:
+        scale = setting / max(arena)
+    return (round(arena[0] * scale), round(arena[1] * scale))
+
+
+def place_window(pygame, area, size):
+    """Put the window at the top of the work area, centred horizontally. The
+    window manager keeps the title bar on screen, so the drawing area ends up
+    just below it."""
+    try:
+        from pygame._sdl2.video import Window
+    except ImportError:
+        return
+    x, y, width, _ = area
+    Window.from_display_module().position = (x + max(0, (width - size[0]) // 2), y)
+
+
+def show_view(raw_env):
+    """Scale the finished canvas into the window and display it. Returns the
+    window's pixels as Aquarium's get_frame does, (width, height, 3)."""
+    import pygame
+
+    window = getattr(raw_env, "window", None)
+    if window is None:
+        return None
+    pygame.transform.smoothscale(raw_env.view.screen, window.get_size(), window)
+    pygame.display.update()
+    return pygame.surfarray.array3d(window)
 
 
 def patch_grass(raw_env, **settings):

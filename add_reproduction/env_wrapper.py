@@ -383,6 +383,30 @@ def _patch_egocentric_obs(raw_env) -> int:
     return size
 
 
+def _patch_scaled_view(raw_env, window_size) -> None:
+    """Show the Aquarium window larger than the arena, without changing the
+    simulation: Aquarium draws onto an arena-sized canvas (grass.ensure_view)
+    and every rendered frame is scaled into the window (grass.show_view).
+    window_size is "fit" (fit the screen) or the window's longer side in
+    pixels. rgb_array frames then have the window's size."""
+    from grass import ensure_view, show_view
+
+    if window_size != "fit" and (type(window_size) is not int or window_size < 1):
+        raise ValueError('render_window_size must be "fit", None, or pixels')
+    raw_env.window_size = window_size
+    original_render = raw_env.render
+
+    def render(mode=None):
+        ensure_view(raw_env)
+        frame = original_render(mode)
+        scaled = show_view(raw_env)
+        if raw_env.render_mode == "rgb_array" and scaled is not None:
+            return scaled
+        return frame
+
+    raw_env.render = render
+
+
 class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
     """ParallelPettingZooEnv with Aquarium-specific fixes (see Codex
     review, 2026-09-18). Besides the ones below, __init__ applies
@@ -426,6 +450,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         grass_config=None,
         energy_config=None,
         reproduction_config=None,
+        render_window_size=None,
     ):
         if obs_stack < 1:
             raise ValueError(f"obs_stack must be >= 1, got {obs_stack}")
@@ -460,6 +485,8 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             from reproduction import patch_reproduction
 
             patch_reproduction(raw_env, **reproduction_config)
+        if render_window_size is not None:
+            _patch_scaled_view(raw_env, render_window_size)
         super().__init__(env)
         self.reward_scale = reward_scale
         self.predator_shaping = predator_shaping
@@ -647,6 +674,8 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
       for both species (see energy.py);
     - `reproduction_*` settings: energy-threshold births with a fixed agent
       ID pool (see reproduction.py);
+    - `render_window_size`: show the window larger than the arena, "fit" to
+      the screen or the longer side in pixels (default None: 1:1);
     - `procreate` (Aquarium's own births), which is rejected: with it
       enabled, Aquarium creates prey IDs absent from the initial
       possible_agents/observation-space snapshot that ParallelPettingZooEnv
@@ -714,6 +743,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
             for key in reproduction_keys
             if key in env_config
         }
+    render_window_size = env_config.pop("render_window_size", None)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
         raise ValueError(
@@ -733,6 +763,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         grass_config=grass_config,
         energy_config=energy_config,
         reproduction_config=reproduction_config,
+        render_window_size=render_window_size,
     )
 
 
