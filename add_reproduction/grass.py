@@ -143,13 +143,13 @@ def ensure_view(raw_env):
         pygame.init()
         headless = pygame.display.get_driver() in ("dummy", "offscreen")
         area = None if headless else work_area(pygame)  # before any window
-        view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
         size = window_size(raw_env, area)
+        if area is not None and getattr(raw_env, "window_size", None) is not None:
+            place_window(area, size)
+        view = View(raw_env.width, raw_env.height, raw_env.caption, raw_env.fps)
         if size != (raw_env.width, raw_env.height):
             raw_env.window = pygame.display.set_mode(size)
             view.screen = pygame.Surface((raw_env.width, raw_env.height))
-        if area is not None and getattr(raw_env, "window_size", None) is not None:
-            place_window(pygame, area, size)
         raw_env.view = view
     return raw_env.view
 
@@ -196,16 +196,20 @@ def window_size(raw_env, area):
     return (round(arena[0] * scale), round(arena[1] * scale))
 
 
-def place_window(pygame, area, size):
-    """Put the window at the top of the work area, centred horizontally. The
-    window manager keeps the title bar on screen, so the drawing area ends up
-    just below it."""
-    try:
-        from pygame._sdl2.video import Window
-    except ImportError:
-        return
+def place_window(area, size):
+    """Ask SDL to open the window at the top of the work area, centred
+    horizontally; the window manager keeps the title bar on screen, so the
+    drawing area ends up just below it. Must run before the window exists.
+
+    Uses SDL_VIDEO_WINDOW_POS, not pygame._sdl2's Window: a Window object
+    registers itself on the SDL window, and every later window event points
+    at it, so letting it be freed crashed pygame (segfault in event cleanup).
+    An SDL_VIDEO_WINDOW_POS set by the user is left alone."""
+    import os
+
     x, y, width, _ = area
-    Window.from_display_module().position = (x + max(0, (width - size[0]) // 2), y)
+    left = x + max(0, (width - size[0]) // 2)
+    os.environ.setdefault("SDL_VIDEO_WINDOW_POS", f"{left},{y}")
 
 
 def show_view(raw_env):

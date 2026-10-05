@@ -21,7 +21,7 @@ BASE = {
     "energy_predator_decay": 1.0,
     "energy_prey_decay": 0.5,
     "energy_grass_gain": 20.0,
-    "energy_catch_efficiency": 0.5,
+    "energy_catch_efficiency_predator": 0.5,
 }
 
 
@@ -54,7 +54,7 @@ def idle(env, obs):
         {"prey_initial": 0},
         {"predator_decay": -1},
         {"grass_gain": float("nan")},
-        {"catch_efficiency": 1.5},
+        {"catch_efficiency_predator": 1.5},
         {"prey_initial": 150, "prey_max": 100},
         {"predator_max": True},
     ],

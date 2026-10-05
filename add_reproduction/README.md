@@ -130,7 +130,7 @@ PredPreyGrass's 100 grass cells become `grass_count = 100` patches.
 | `energy_predator_decay` | 0.15 / 8 | Predator energy lost per physics step |
 | `energy_prey_decay` | 0.05 / 8 | Prey energy lost per physics step |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
-| `energy_catch_efficiency` | 1.0 | Share of a caught prey's energy its catcher gains |
+| `energy_catch_efficiency_predator` | 0.5 | Share of a caught prey's energy its catcher gains |
 | `predator_max_age` | 10^9 | Aquarium's own starvation clock, kept off |
 
 These use PredPreyGrass's energy units, with its per-step rates divided by 8,
@@ -140,7 +140,7 @@ reproduction thresholds, so they rarely bind and mainly scale each agent's
 own-energy input (energy / max). Without food, a predator starves after 267
 steps and a prey after 480 steps.
 
-Each step, catching predators gain catch_efficiency times the prey's energy,
+Each step, catching predators gain catch_efficiency_predator times the prey's energy,
 prey gain energy per grass patch eaten, and every animal loses its decay.
 Animals at or below zero energy starve: they are removed and terminated, with
 `infos[agent]["starved"] = True`. Reproduction follows. The episode ends once

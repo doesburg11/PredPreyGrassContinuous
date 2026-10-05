@@ -35,6 +35,12 @@ config_env = {
     "prey_max_acceleration": 1,
     "predator_max_steer_force": 0.6,  # How sharply it can turn.
     "prey_max_steer_force": 0.6,
+    # Body radii (Aquarium's defaults: 30 and 20). A predator catches a prey
+    # when their centres are closer than the sum, now 32 units (~1 grid cell;
+    # in PredPreyGrass it has to step onto the prey's cell). Same-species
+    # animals bump apart at the sum of their radii. Sprites keep their size.
+    "predator_radius": 16,
+    "prey_radius": 16,
     "prey_fov": 240,  # view cone in degrees
     "predator_fov": 150,
     "prey_view_distance": 267,  # View cone radius in simulation units.
@@ -57,7 +63,8 @@ config_env = {
     "energy_predator_decay": 0.15 / 8,  # Lost per physics step.
     "energy_prey_decay": 0.05 / 8,
     "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
-    "energy_catch_efficiency": 1.0,  # PPG: the predator gains all prey energy.
+    # Share of a caught prey's energy the catching predator gains (PPG: 1.0).
+    "energy_catch_efficiency_predator": 0.5,
     # Aquarium's own predator starvation clock (death after this many steps
     # without a catch). Kept off so energy is the only way to starve.
     "predator_max_age": 10**9,

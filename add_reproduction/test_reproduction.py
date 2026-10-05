@@ -409,3 +409,18 @@ def test_render_window_scales_the_picture_not_the_arena(monkeypatch, size):
 def test_render_window_size_is_validated():
     with pytest.raises(ValueError, match="render_window_size"):
         make(render_window_size="big")
+
+
+def test_window_is_placed_through_sdl_env_var_not_a_window_object(monkeypatch):
+    # A pygame._sdl2 Window object, once freed, is still referenced by every
+    # window event and crashed pygame; placement must not create one.
+    from grass import place_window
+
+    monkeypatch.delenv("SDL_VIDEO_WINDOW_POS", raising=False)
+    place_window((0, 0, 2560, 1020), (980, 980))
+    import os
+
+    assert os.environ["SDL_VIDEO_WINDOW_POS"] == "790,0"
+    monkeypatch.setenv("SDL_VIDEO_WINDOW_POS", "5,5")  # a user's own choice wins
+    place_window((0, 0, 2560, 1020), (980, 980))
+    assert os.environ["SDL_VIDEO_WINDOW_POS"] == "5,5"

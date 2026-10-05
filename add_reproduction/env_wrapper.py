@@ -710,7 +710,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "energy_predator_decay",
         "energy_prey_decay",
         "energy_grass_gain",
-        "energy_catch_efficiency",
+        "energy_catch_efficiency_predator",
     )
     energy_config = None
     if any(key in env_config for key in energy_keys):

@@ -34,7 +34,7 @@ class EnergyLayer:
         predator_decay=0.15 / 8,
         prey_decay=0.05 / 8,
         grass_gain=2.0,
-        catch_efficiency=1.0,
+        catch_efficiency_predator=1.0,
     ):
         settings = {
             "predator_initial": (predator_initial, True),
@@ -44,7 +44,7 @@ class EnergyLayer:
             "predator_decay": (predator_decay, False),
             "prey_decay": (prey_decay, False),
             "grass_gain": (grass_gain, False),
-            "catch_efficiency": (catch_efficiency, False),
+            "catch_efficiency_predator": (catch_efficiency_predator, False),
         }
         for name, (value, positive) in settings.items():
             if (
@@ -63,13 +63,13 @@ class EnergyLayer:
                 raise ValueError(
                     f"energy_{species}_initial must not exceed energy_{species}_max"
                 )
-        if catch_efficiency > 1:
-            raise ValueError("energy_catch_efficiency must be in [0, 1]")
+        if catch_efficiency_predator > 1:
+            raise ValueError("energy_catch_efficiency_predator must be in [0, 1]")
         self.initial = {"predator": predator_initial, "prey": prey_initial}
         self.max = {"predator": predator_max, "prey": prey_max}
         self.decay = {"predator": predator_decay, "prey": prey_decay}
         self.grass_gain = grass_gain
-        self.catch_efficiency = catch_efficiency
+        self.catch_efficiency_predator = catch_efficiency_predator
 
     def energy(self, entity):
         return getattr(entity, "energy", self.initial[species_of(entity)])
@@ -86,7 +86,8 @@ def patch_energy(raw_env, **settings):
     """Attach energy to one Aquarium instance before RLlib snapshots its spaces.
 
     Each step, after Aquarium's movement and captures and after grass is
-    eaten: catching predators gain catch_efficiency times the prey's energy,
+    eaten: catching predators gain catch_efficiency_predator times the prey's
+    energy,
     prey gain grass_gain per patch eaten, every living animal loses its
     species' decay, and animals at or below zero energy starve: they are
     removed like a caught prey and terminated. The episode ends once no
@@ -160,7 +161,7 @@ def patch_energy(raw_env, **settings):
         obs, rewards, terms, truncs, infos = original_step(actions)
         for predator, prey_energy in catches:
             if predator.alive:
-                layer.gain(predator, layer.catch_efficiency * prey_energy)
+                layer.gain(predator, layer.catch_efficiency_predator * prey_energy)
         catches.clear()
         for prey in raw_env.prey:
             eaten = infos.get(prey.id(), {}).get("grass_eaten", 0)
