@@ -1,34 +1,25 @@
 """Roll out a trained checkpoint (or a uniform-random baseline) and
 visualize it with Aquarium's own pygame renderer.
 
-train.py runs with render_mode=None (see env_wrapper.py) -- this script
-is the first place render_mode="rgb_array" actually gets used. With
---checkpoint, it restores a full Algorithm from an RLlib checkpoint (see
-train.py --checkpoint-dir) and steps it greedily (argmax over each
-RLModule's action-dist logits -- no exploration), or with --stochastic
-samples from those logits as training does. With --random, no
-checkpoint/RLlib Algorithm is involved at all -- every agent just samples
-its action space uniformly at random each step, as a baseline to compare
-trained behavior against.
+Settings come from config/config_eval.py; edit it, then run from the
+repository root (no command-line arguments):
 
-Usage:
-    python eval.py --recommended --episodes 3
-    python train.py --checkpoint-dir /tmp/aquarium-ckpt --iterations 20
-    python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 3
-    python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 1 --render video
-    python eval.py --checkpoint /tmp/aquarium-ckpt --episodes 10 --render none
-    python eval.py --random --predator-count 1 --prey-count 4 --episodes 3
+    .conda/bin/python add_reproduction/eval.py
 
---render window (default) opens Aquarium's live pygame window. --render
-video does the same but also saves an mp4 per episode to --out-dir
-(Aquarium always opens a real display window when rendering; on a
-headless box, run with SDL_VIDEODRIVER=dummy to render off-screen and
-still get the mp4s). --render none skips rendering entirely, for a fast,
-display-free numeric eval.
+source "checkpoint" restores a full Algorithm from an RLlib checkpoint and
+samples actions from its policies as training does (stochastic=True) or
+takes the argmax. source "random" involves no checkpoint at all: every agent
+samples its action space uniformly at random, as a baseline.
+
+render "window" opens Aquarium's live pygame window; "video" also saves an
+mp4 per episode to out_dir (on a headless machine, set SDL_VIDEODRIVER=dummy
+to render off-screen and still get the mp4s); "none" skips rendering, for a
+fast numeric evaluation.
 """
 
-import argparse
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -36,13 +27,14 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.core.columns import Columns
 
 from config.config_env import config_env
+from config.config_eval import config_eval
 from env_wrapper import make_env, register
 from learned_policies import SpeciesPolicies, recommended_paths, species_mapping
 
 
 @torch.inference_mode()
 def select_actions(
-    algo: Algorithm, obs: dict, mapping_fn, stochastic: bool = False
+    algo: Algorithm | SpeciesPolicies, obs: dict, mapping_fn, stochastic: bool = False
 ) -> dict:
     actions = {}
     for agent_id, agent_obs in obs.items():
@@ -67,20 +59,52 @@ def select_random_actions(env, obs: dict) -> dict:
     return {agent_id: env.action_space[agent_id].sample() for agent_id in obs}
 
 
-def _positive_int(value: str) -> int:
-    parsed = int(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError(f"must be a positive integer, got {parsed}")
-    return parsed
+SOURCES = ("checkpoint", "random", "recommended")
+RENDERS = ("window", "video", "none")
 
 
-def _fov_degrees(value: str) -> int:
-    parsed = int(value)
-    if not 0 < parsed <= 360:
-        raise argparse.ArgumentTypeError(
-            f"must be a field of view in (0, 360] degrees, got {parsed}"
-        )
-    return parsed
+def load_settings():
+    """Copy and validate config_eval without modifying the source dictionary."""
+    settings = dict(config_eval)
+    if settings["source"] not in SOURCES:
+        raise ValueError(f"source must be one of {SOURCES}")
+    if settings["render"] not in RENDERS:
+        raise ValueError(f"render must be one of {RENDERS}")
+    if settings["source"] == "checkpoint" and not settings["checkpoint"]:
+        raise ValueError('source "checkpoint" needs a checkpoint path')
+    if settings["model_seed"] not in (0, 1, 2):
+        raise ValueError("model_seed must be 0, 1 or 2")
+    positive = ["episodes", "fps"]
+    optional_positive = ["predator_count", "prey_count", "max_time_steps", "window_fps"]
+    for name in positive + optional_positive:
+        value = settings[name]
+        if value is None and name in optional_positive:
+            continue
+        if type(value) is not int or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+    overrides = settings["env_overrides"]
+    if not isinstance(overrides, dict) or not all(
+        isinstance(key, str) for key in overrides
+    ):
+        raise ValueError("env_overrides must be a dict of config_env settings")
+    settings["env_overrides"] = dict(overrides)
+    for name in ("prey_fov", "predator_fov"):
+        value = settings[name]
+        if value is not None and (type(value) is not int or not 0 < value <= 360):
+            raise ValueError(f"{name} must be an integer in (0, 360] or None")
+    for name in (
+        "stochastic",
+        "no_respawn",
+        "draw_view_cones",
+        "draw_force_vectors",
+        "draw_hit_boxes",
+        "draw_death_circles",
+    ):
+        if type(settings[name]) is not bool:
+            raise ValueError(f"{name} must be True or False")
+    if type(settings["seed"]) is not int:
+        raise ValueError("seed must be an integer")
+    return SimpleNamespace(**settings)
 
 
 def save_video(frames: list, out_dir: str, episode: int, fps: int = 60) -> None:
@@ -98,103 +122,12 @@ def save_video(frames: list, out_dir: str, episode: int, fps: int = 60) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument(
-        "--checkpoint",
-        help="RLlib checkpoint dir (from train.py --checkpoint-dir)",
-    )
-    source.add_argument(
-        "--recommended",
-        action="store_true",
-        help="Run improved learned predator and pool-trained prey together",
-    )
-    parser.add_argument("--model-seed", type=int, choices=[0, 1, 2], default=0)
-    parser.add_argument("--seed", type=int, default=0, help="First episode seed")
-    source.add_argument(
-        "--random",
-        action="store_true",
-        help="No checkpoint -- every agent samples its action space "
-        "uniformly at random",
-    )
-    parser.add_argument(
-        "--predator-count",
-        type=_positive_int,
-        default=None,
-        help="Only used with --random; defaults to config_env (a checkpoint's "
-        "own env_config is reused otherwise)",
-    )
-    parser.add_argument(
-        "--prey-count",
-        type=_positive_int,
-        default=None,
-        help="Only used with --random; defaults to config_env",
-    )
-    parser.add_argument(
-        "--max-time-steps",
-        type=_positive_int,
-        default=None,
-        help="Only used with --random; defaults to config_env",
-    )
-    parser.add_argument(
-        "--prey-fov",
-        type=_fov_degrees,
-        default=None,
-        help="Override the prey field of view in degrees (Aquarium's default "
-        "is 120; a --checkpoint policy was trained at whatever value it was "
-        "trained with, so widening it here feeds that policy information it "
-        "never learned to use -- a real behavior change, not just a wider "
-        "drawn cone). Omit to keep the checkpoint's/default value.",
-    )
-    parser.add_argument(
-        "--predator-fov",
-        type=_fov_degrees,
-        default=None,
-        help="Same as --prey-fov but for predators (Aquarium's default is 150).",
-    )
-    parser.add_argument(
-        "--no-respawn",
-        action="store_true",
-        help="Caught prey die for good instead of respawning. A --checkpoint "
-        "trained with train.py --no-respawn already has this set.",
-    )
-    parser.add_argument("--episodes", type=_positive_int, default=1)
-    parser.add_argument(
-        "--stochastic",
-        action="store_true",
-        help="With --checkpoint or --recommended, sample each action from the policy's "
-        "distribution (as during training) instead of taking the argmax.",
-    )
-    parser.add_argument(
-        "--render", choices=["window", "video", "none"], default="window"
-    )
-    parser.add_argument(
-        "--out-dir", default="videos", help="Where --render video saves mp4s"
-    )
-    parser.add_argument(
-        "--fps",
-        type=_positive_int,
-        default=60,
-        help="Frame rate of --render video mp4s. Frames are captured once per "
-        "decision, so with action repeat lower it (e.g. 10) to keep the "
-        "video watchable.",
-    )
-    parser.add_argument(
-        "--population-csv",
-        default=None,
-        help="Write step,episode,predators,prey,births per decision to this CSV",
-    )
-    parser.add_argument("--draw-view-cones", action="store_true")
-    parser.add_argument("--draw-force-vectors", action="store_true")
-    parser.add_argument("--draw-hit-boxes", action="store_true")
-    parser.add_argument("--draw-death-circles", action="store_true")
-    args = parser.parse_args()
-
+    args = load_settings()
     register()
     policies = None
     torch.set_num_threads(1)
     torch.manual_seed(args.seed)
-    if args.recommended:
+    if args.source == "recommended":
         algo = None
         policies = SpeciesPolicies(recommended_paths(args.model_seed))
         mapping_fn = species_mapping
@@ -206,7 +139,7 @@ def main():
             "keep_prey_count_constant": False,
             "action_repeat": 1,
         }
-    elif args.random:
+    elif args.source == "random":
         algo = None
         mapping_fn = None
         env_config = dict(config_env)
@@ -229,12 +162,17 @@ def main():
         draw_hit_boxes=args.draw_hit_boxes,
         draw_death_circles=args.draw_death_circles,
     )
+    if args.window_fps is not None:
+        env_config["fps"] = args.window_fps
     if args.prey_fov is not None:
         env_config["prey_fov"] = args.prey_fov
     if args.predator_fov is not None:
         env_config["predator_fov"] = args.predator_fov
     if args.no_respawn:
         env_config["keep_prey_count_constant"] = False
+    env_config.update(args.env_overrides)
+    if args.env_overrides:
+        print(f"environment overrides: {args.env_overrides}")
     env = make_env(env_config)
 
     raw_env = env.par_env.aec_env.unwrapped
@@ -280,7 +218,7 @@ def main():
                     if infos.get(agent_id, {}).get("starved"):
                         starved[species] += 1
                         continue
-                    # A prey that dies for good (--no-respawn) is terminated.
+                    # A prey that dies for good (no respawn) is terminated.
                     # A respawned prey isn't, but gets Aquarium's default
                     # prey_punishment (1000), which dwarfs every other
                     # per-step reward, so the threshold only fires on a catch.
@@ -349,4 +287,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        raise SystemExit(
+            "eval.py takes no command-line arguments. Edit config/config_eval.py."
+        )
     main()

@@ -170,20 +170,23 @@ differ.
 
 The viewer draws grass under the animals and an energy bar above each animal.
 
+Evaluation settings live in `config/config_eval.py`: what to run
+(`source`: a training `checkpoint`, or `random` actions as a baseline), the
+number of episodes and their seed, sampled or argmax actions, the display
+(`render`: `window`, `video` or `none`) and its speed, and an optional
+population CSV. Edit it, then run without command-line arguments:
+
 ```bash
-.conda/bin/python add_reproduction/eval.py --random --draw-view-cones
-.conda/bin/python add_reproduction/eval.py --random --render none --episodes 10 \
-    --population-csv populations.csv
-.conda/bin/python add_reproduction/eval.py --checkpoint add_reproduction/runs/<run>/checkpoint \
-    --stochastic --episodes 3
+.conda/bin/python add_reproduction/eval.py
 ```
 
-`--random` uses the population counts and episode length from
-`config_env.py`, unless `--predator-count`, `--prey-count` or
-`--max-time-steps` is given. Evaluation prints returns, prey caught, grass
-eaten, starvations, births and peak and final populations per species (as
-predator/prey). `--population-csv` writes the population and cumulative
-births after every decision.
+With `source = "random"`, the population counts and episode length come from
+`config_env.py` unless `predator_count`, `prey_count` or `max_time_steps` is
+set in `config_eval.py`; a checkpoint always keeps the settings it was trained
+with. Evaluation prints returns, prey caught, grass eaten, starvations,
+births and peak and final populations per species (as predator/prey).
+`population_csv` writes the population and cumulative births after every
+decision.
 
 Tests:
 
