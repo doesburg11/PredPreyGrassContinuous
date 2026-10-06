@@ -51,7 +51,30 @@ config_env = {
     "grass_count": 100,
     "grass_consume_radius": 12.0,
     "grass_food_reward": 0.0,  # Raw reward, before reward_scale.
-    "grass_respawn_delay": 400,  # Physics steps; patches regrow in place.
+    "grass_respawn_delay": 400,  # Physics steps until an eaten patch regrows.
+    # False: patches placed uniformly at random. True: grass_cluster_count
+    # clusters, each centred in its own cell of a grid over the arena, with the
+    # patches split evenly over them and scattered around each centre (normal
+    # offsets with standard deviation grass_cluster_spread, in arena units).
+    "grass_clustered": True,
+    "grass_cluster_count": 5,
+    "grass_cluster_spread": 48.0,
+    # False: an eaten patch regrows in the same spot. True: at a new random
+    # spot (within its own cluster when clustered, so clusters persist).
+    "grass_random_respawn": False,
+    # Seed dispersal (needs grass_clustered; not with grass_random_respawn): an
+    # eaten patch regrows next to a living patch of its cluster (normal offsets
+    # with standard deviation grass_dispersal_distance), so clusters creep away
+    # from where grazing removes their edge.
+    "grass_dispersal": True,
+    "grass_dispersal_distance": 24.0,
+    # Overgrazing (needs grass_clustered): a cluster grazed down to this share
+    # of its patches (0.0: grazed bare) dies back and, after
+    # grass_overgrazing_delay physics steps, regrows around a new centre in a
+    # grid cell no other cluster uses.
+    "grass_overgrazing": True,
+    "grass_overgrazing_threshold": 0.0,
+    "grass_overgrazing_delay": 400,
     # Energy, in PredPreyGrass base_environment units. Its per-step rates are
     # divided by 8: crossing this arena takes ~8x as many steps as its 25x25
     # grid (800 units at 4-5 units/step vs 25 cells at 1 cell/step).

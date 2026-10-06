@@ -572,6 +572,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         if seed is not None:
             random.seed(seed)
         obs, infos = super().reset(seed=seed, options=options)
+        self.agents = list(obs)
         if self.predator_shaping:
             self._potentials = self._predator_potentials()
         return self._stack(obs, reset=True), infos
@@ -644,6 +645,10 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             self._potentials = potentials
         if self.reward_scale != 1.0:
             rewards = {agent: r * self.reward_scale for agent, r in rewards.items()}
+        # RLlib expects every agent in a step's result among env.agents
+        # (its env check rejects others): the living, newborns, and agents
+        # whose last step this was.
+        self.agents = [agent for agent in terminateds if agent != "__all__"]
         return self._stack(obs), rewards, terminateds, truncateds, infos
 
     def close(self):
@@ -695,6 +700,15 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "grass_consume_radius",
         "grass_food_reward",
         "grass_respawn_delay",
+        "grass_clustered",
+        "grass_cluster_count",
+        "grass_cluster_spread",
+        "grass_random_respawn",
+        "grass_dispersal",
+        "grass_dispersal_distance",
+        "grass_overgrazing",
+        "grass_overgrazing_threshold",
+        "grass_overgrazing_delay",
     )
     grass_config = None
     if any(key in env_config for key in grass_keys):

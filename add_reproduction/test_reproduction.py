@@ -446,3 +446,34 @@ def test_population_lines_use_each_species_color():
         return np.argwhere((pixels == np.array(color)).all(axis=-1))[:, 1].mean()
 
     assert mean_row(PREY_COLOR) < mean_row(PREDATOR_COLOR)  # smaller y is higher
+
+
+def test_env_agents_follow_births_and_deaths_for_rllib():
+    from ray.rllib.utils.pre_checks.env import check_multiagent_environments
+
+    env = make()
+    try:
+        obs, raw = setup(env)
+        assert set(env.agents) == set(obs)
+        raw.predators[0].energy = 20.0  # gives birth this step
+        raw.prey[1].energy = 0.1  # starves this step
+        obs, _, terms, _, _ = env.step(act(obs))
+        assert "predator_2" in env.agents and "prey_1" in env.agents
+        assert set(obs) <= set(env.agents)
+        assert set(terms) - {"__all__"} == set(env.agents)
+        obs, _, _, _, _ = env.step({agent: 0 for agent in obs if agent != "prey_1"})
+        assert "prey_1" not in env.agents  # gone after its final step
+        # RLlib's own startup check, on an env whose first step has a birth.
+        setup(env)
+        raw.prey[0].energy = 9.0
+        original_reset = env.reset
+
+        def reset_with_birth_ready(*, seed=None, options=None):
+            result = original_reset(seed=seed, options=options)
+            raw.prey[0].energy = 9.0
+            return result
+
+        env.reset = reset_with_birth_ready
+        check_multiagent_environments(env)
+    finally:
+        env.close()

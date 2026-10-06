@@ -1,4 +1,5 @@
-"""Stationary, renewable food patches for the minimal grass experiment."""
+"""Renewable food patches: placed at random or in clusters, regrowing in
+place or at a new random spot."""
 
 import math
 import random
@@ -14,10 +15,37 @@ from marl_aquarium.env.vector import Vector
 class GrassPatch:
     position: Vector
     ready_at: int = 0
+    cluster: int | None = None  # Index into GrassLayer.centres when clustered.
+    # Where the patch regrows, chosen when it does: None keeps its spot,
+    # "disperse" near a living patch of its cluster, "centre" around the
+    # cluster's centre.
+    regrow: str | None = None
 
 
 class GrassLayer:
-    """Use a separate RNG and physics-step clock; preserve each patch location."""
+    """Grass patches with their own seeded RNG and physics-step clock.
+
+    Placement at reset: uniform over the arena, or (clustered) in
+    cluster_count clusters whose centres each get their own cell of a grid
+    over the arena, with patches split evenly over the clusters and scattered
+    around each centre (normal offsets with sd cluster_spread, wrapped across
+    the edges). An eaten patch regrows after respawn_delay physics steps: in
+    the same spot, or (random_respawn) at a new random spot, within its own
+    cluster when clustered, so clusters persist.
+
+    Two clustered-only dynamics let the prey move the grass:
+
+    - dispersal (seed dispersal): an eaten patch regrows next to a living
+      patch of its cluster, chosen at random when it regrows (normal offsets
+      with sd dispersal_distance), or around the cluster's centre if none is
+      left. Clusters creep away from where grazing removes their edge.
+    - overgrazing: when a cluster is grazed down to overgrazing_threshold or
+      less of its patches, it collapses: its remaining patches die back, its
+      centre moves to a grid cell no other cluster uses, and after
+      overgrazing_delay physics steps the whole cluster regrows around the
+      new centre. It cannot collapse again until it has recovered above the
+      threshold.
+    """
 
     def __init__(
         self,
@@ -26,16 +54,38 @@ class GrassLayer:
         consume_radius=12.0,
         food_reward=10.0,
         respawn_delay=100,
+        clustered=False,
+        cluster_count=10,
+        cluster_spread=48.0,
+        random_respawn=False,
+        dispersal=False,
+        dispersal_distance=24.0,
+        overgrazing=False,
+        overgrazing_threshold=0.0,
+        overgrazing_delay=400,
     ):
         for name, value, minimum in (
             ("count", count, 0),
             ("respawn_delay", respawn_delay, 1),
+            ("cluster_count", cluster_count, 1),
+            ("overgrazing_delay", overgrazing_delay, 1),
         ):
             if type(value) is not int or value < minimum:
                 raise ValueError(f"grass_{name} must be an integer >= {minimum}")
+        for name, value in (
+            ("clustered", clustered),
+            ("random_respawn", random_respawn),
+            ("dispersal", dispersal),
+            ("overgrazing", overgrazing),
+        ):
+            if type(value) is not bool:
+                raise ValueError(f"grass_{name} must be True or False")
         for name, value, positive in (
             ("consume_radius", consume_radius, True),
             ("food_reward", food_reward, False),
+            ("cluster_spread", cluster_spread, True),
+            ("dispersal_distance", dispersal_distance, True),
+            ("overgrazing_threshold", overgrazing_threshold, False),
         ):
             if (
                 isinstance(value, bool)
@@ -48,25 +98,98 @@ class GrassLayer:
                     f"grass_{name} must be finite and "
                     f"{'positive' if positive else 'nonnegative'}"
                 )
+        if not 0 <= overgrazing_threshold < 1:
+            raise ValueError("grass_overgrazing_threshold must be in [0, 1)")
+        if (dispersal or overgrazing) and not clustered:
+            raise ValueError(
+                "grass_dispersal and grass_overgrazing require grass_clustered"
+            )
+        if dispersal and random_respawn:
+            raise ValueError(
+                "grass_dispersal and grass_random_respawn both choose where an "
+                "eaten patch regrows; enable only one"
+            )
         self.env = raw_env
         self.count = count
         self.consume_radius = consume_radius
         self.food_reward = food_reward
         self.respawn_delay = respawn_delay
+        self.clustered = clustered
+        self.cluster_count = cluster_count
+        self.cluster_spread = cluster_spread
+        self.random_respawn = random_respawn
+        self.dispersal = dispersal
+        self.dispersal_distance = dispersal_distance
+        self.overgrazing = overgrazing
+        self.overgrazing_threshold = overgrazing_threshold
+        self.overgrazing_delay = overgrazing_delay
+        self.rng = random.Random()
+        self.centres = []
+        self.collapsed = []
+        self.total_collapses = 0
         self.patches = []
         self.tick = 0
         self.total_consumed = 0
 
     def reset(self, seed=None):
-        rng = random.Random(seed)
-        self.patches = [
-            GrassPatch(
-                Vector(rng.uniform(0, self.env.width), rng.uniform(0, self.env.height))
-            )
-            for _ in range(self.count)
-        ]
+        self.rng = random.Random(seed)
+        if self.clustered:
+            self.centres = self.cluster_centres()
+            self.patches = []
+            for i in range(self.count):
+                cluster = i % self.cluster_count
+                self.patches.append(GrassPatch(self.spot(cluster), cluster=cluster))
+        else:
+            self.centres = []
+            self.patches = [GrassPatch(self.spot()) for _ in range(self.count)]
+        self.collapsed = [False] * len(self.centres)
         self.tick = 0
         self.total_consumed = 0
+        self.total_collapses = 0
+
+    def grid(self):
+        """Columns and rows of the grid that spreads clusters over the arena
+        (4 x 3 for 10 clusters on a square arena)."""
+        width, height = self.env.width, self.env.height
+        columns = math.ceil(math.sqrt(self.cluster_count * width / height))
+        return columns, math.ceil(self.cluster_count / columns)
+
+    def cell_of(self, position):
+        columns, rows = self.grid()
+        column = min(int(position.x / (self.env.width / columns)), columns - 1)
+        row = min(int(position.y / (self.env.height / rows)), rows - 1)
+        return row * columns + column
+
+    def centre_in(self, cell):
+        """A random point in the middle half of a grid cell."""
+        columns, rows = self.grid()
+        cell_w, cell_h = self.env.width / columns, self.env.height / rows
+        return Vector(
+            (cell % columns + self.rng.uniform(0.25, 0.75)) * cell_w,
+            (cell // columns + self.rng.uniform(0.25, 0.75)) * cell_h,
+        )
+
+    def cluster_centres(self):
+        """One centre per cluster, each in its own grid cell, so clusters are
+        spread out."""
+        columns, rows = self.grid()
+        cells = self.rng.sample(range(columns * rows), self.cluster_count)
+        return [self.centre_in(cell) for cell in cells]
+
+    def near(self, position, spread):
+        """A point scattered around position (wrapped across the edges)."""
+        return Vector(
+            (position.x + self.rng.gauss(0, spread)) % self.env.width,
+            (position.y + self.rng.gauss(0, spread)) % self.env.height,
+        )
+
+    def spot(self, cluster=None):
+        """A random patch position: uniform over the arena, or scattered
+        around a cluster's centre (wrapped across the arena's edges)."""
+        width, height = self.env.width, self.env.height
+        if cluster is None:
+            return Vector(self.rng.uniform(0, width), self.rng.uniform(0, height))
+        return self.near(self.centres[cluster], self.cluster_spread)
 
     def available(self, patch):
         return patch.ready_at <= self.tick
@@ -78,6 +201,9 @@ class GrassLayer:
         occur across arena edges. A prey may eat multiple patches in a step.
         """
         self.tick += 1
+        for patch in self.patches:
+            if patch.regrow is not None and self.available(patch):
+                self.place(patch)
         eaten = {}
         for patch in self.patches:
             if not self.available(patch):
@@ -95,8 +221,66 @@ class GrassLayer:
                 _, agent = min(candidates)
                 eaten[agent] = eaten.get(agent, 0) + 1
                 patch.ready_at = self.tick + self.respawn_delay
+                if self.random_respawn:
+                    # Moves now, but stays hidden until it has regrown.
+                    patch.position = self.spot(patch.cluster)
+                elif self.dispersal:
+                    patch.regrow = "disperse"
                 self.total_consumed += 1
+        if self.overgrazing:
+            self.check_overgrazing()
         return eaten
+
+    def place(self, patch):
+        """Position a patch that regrows now (it stays hidden until then)."""
+        if patch.regrow == "disperse":
+            parents = [
+                other
+                for other in self.patches
+                if other is not patch
+                and other.cluster == patch.cluster
+                and other.regrow is None
+                and self.available(other)
+            ]
+            if parents:
+                parent = self.rng.choice(parents)
+                patch.position = self.near(parent.position, self.dispersal_distance)
+            else:  # nothing left to seed from: regrow from the seed bank
+                patch.position = self.spot(patch.cluster)
+        elif patch.regrow == "centre":
+            patch.position = self.spot(patch.cluster)
+        patch.regrow = None
+
+    def check_overgrazing(self):
+        """Collapse clusters grazed down to the threshold; re-arm recovered
+        ones."""
+        for cluster in range(len(self.centres)):
+            members = [p for p in self.patches if p.cluster == cluster]
+            living = sum(self.available(p) for p in members)
+            limit = self.overgrazing_threshold * len(members)
+            if self.collapsed[cluster]:
+                if living > limit:
+                    self.collapsed[cluster] = False
+            elif living <= limit:
+                self.collapse(cluster, members)
+
+    def collapse(self, cluster, members):
+        """The cluster dies back and regrows elsewhere after a delay."""
+        self.collapsed[cluster] = True
+        self.total_collapses += 1
+        used = {self.cell_of(c) for i, c in enumerate(self.centres) if i != cluster}
+        used.add(self.cell_of(self.centres[cluster]))
+        columns, rows = self.grid()
+        free = [cell for cell in range(columns * rows) if cell not in used]
+        if not free:  # every cell taken: any cell but its own
+            own = self.cell_of(self.centres[cluster])
+            free = [cell for cell in range(columns * rows) if cell != own] or [own]
+        self.centres[cluster] = self.centre_in(self.rng.choice(free))
+        # The whole cluster regrows together, also patches eaten earlier.
+        regrows = self.tick + self.overgrazing_delay
+        for patch in members:
+            patch.ready_at = regrows
+            patch.regrow = "centre"
 
     def observation(self, prey):
         """[seen, wrapped dx/range, wrapped dy/range, distance/range]."""
