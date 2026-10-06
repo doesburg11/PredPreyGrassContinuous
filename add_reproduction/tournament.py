@@ -23,6 +23,11 @@ Usage (from add_reproduction/):
     python tournament.py runs/<run>
     python tournament.py runs/<run> --every 100 --episodes 20
     python tournament.py runs/<run> --iterations 50,200,380
+    python tournament.py runs/<run> --prey-iteration 290  # fixed prey
+
+--prey-iteration plays every predator checkpoint against one prey checkpoint,
+e.g. for a run trained against frozen prey (where all prey checkpoints are
+the same policy), and prints one row per predator checkpoint.
 
 Writes one CSV row per episode (default: <run>/tournament.csv) and prints
 the summary matrices.
@@ -319,6 +324,57 @@ def format_matrix(name, matrix, iterations):
     return "\n".join(lines)
 
 
+def predator_table(rows, iterations):
+    """Per predator checkpoint, pooled over its episodes: catch risk per prey
+    and catches per predator (per 1000 physics steps), the share of episodes
+    that reach the time limit, and mean episode length and populations."""
+    table = []
+    for iteration in iterations:
+        episodes = [row for row in rows if row["predator_iter"] == iteration]
+        if not episodes:
+            continue
+        caught = sum(row["prey_caught"] for row in episodes)
+        steps = [row["physics_steps"] for row in episodes]
+        predator_exposure = sum(
+            row["mean_predators"] * row["physics_steps"] for row in episodes
+        )
+        table.append(
+            {
+                "predator_iter": iteration,
+                "episodes": len(episodes),
+                "catch_risk": 1000 * caught / sum(r["prey_exposure"] for r in episodes),
+                "catches_per_predator": 1000 * caught / max(predator_exposure, 1),
+                "coexist": float(
+                    np.mean([row["outcome"] == "time_limit" for row in episodes])
+                ),
+                "length": float(np.mean(steps)),
+                "mean_predators": float(
+                    np.mean([r["mean_predators"] for r in episodes])
+                ),
+                "mean_prey": float(np.mean([r["mean_prey"] for r in episodes])),
+            }
+        )
+    return table
+
+
+def format_predator_table(rows, iterations):
+    lines = [
+        (
+            " predator  episodes  catch risk  catches/predator  coexist  "
+            "length  predators  prey"
+        ),
+        "                     (per prey and 1000 physics steps)",
+    ]
+    for t in predator_table(rows, iterations):
+        lines.append(
+            f" {t['predator_iter']:>8}  {t['episodes']:>8}  {t['catch_risk']:>10.2f}"
+            f"  {t['catches_per_predator']:>16.2f}  {t['coexist']:>7.0%}"
+            f"  {t['length']:>6.0f}  {t['mean_predators']:>9.1f}"
+            f"  {t['mean_prey']:>4.1f}"
+        )
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     parser.add_argument("run", help="Training run directory (contains checkpoint/)")
@@ -327,6 +383,12 @@ def main():
         "--iterations",
         default=None,
         help="Comma-separated checkpoint iterations (overrides --every)",
+    )
+    parser.add_argument(
+        "--prey-iteration",
+        type=int,
+        default=None,
+        help="Play every predator checkpoint against only this prey checkpoint",
     )
     parser.add_argument("--episodes", type=int, default=10, help="Per matchup")
     parser.add_argument("--seed", type=int, default=0, help="Seed of episode 0")
@@ -348,10 +410,15 @@ def main():
         checkpoint_iterations(run_dir), every=args.every, iterations=requested
     )
     env_config = run_env_config(run_dir, iterations[-1])
+    prey_iterations = iterations
+    if args.prey_iteration is not None:
+        prey_iterations = select_iterations(
+            checkpoint_iterations(run_dir), iterations=[args.prey_iteration]
+        )
     tasks = [
         (predator_iter, prey_iter, episode, args.seed + episode)
         for predator_iter in iterations
-        for prey_iter in iterations
+        for prey_iter in prey_iterations
         for episode in range(args.episodes)
     ]
     out = Path(args.out) if args.out else run_dir / "tournament.csv"
@@ -388,6 +455,10 @@ def main():
                 )
 
     print(f"\nWrote {out}\nRows: predator checkpoint; columns: prey checkpoint.\n")
+    if args.prey_iteration is not None:
+        print(f"Every predator checkpoint against prey {args.prey_iteration}:\n")
+        print(format_predator_table(rows, iterations))
+        return
     matrices = summarize(rows, iterations)
     for name, matrix in matrices.items():
         print(format_matrix(name, matrix, iterations) + "\n")

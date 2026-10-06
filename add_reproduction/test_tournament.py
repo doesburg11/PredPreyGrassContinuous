@@ -129,3 +129,21 @@ def test_play_episode_with_untrained_policies():
         "seed",
     } == set(first)
     assert first == again  # same seed, same episode
+
+
+def test_predator_table_pools_episodes_per_predator_checkpoint():
+    rows = [
+        {**row(10, 290, 1000, 10, 10_000.0, "time_limit"), "mean_predators": 5.0},
+        {**row(10, 290, 3000, 30, 30_000.0, "prey_extinct"), "mean_predators": 5.0},
+        {**row(20, 290, 2000, 40, 10_000.0, "time_limit"), "mean_predators": 10.0},
+    ]
+    for r in rows:
+        r["mean_prey"] = r["prey_exposure"] / r["physics_steps"]
+    table = tournament.predator_table(rows, [10, 20])
+    first, second = table
+    assert first["episodes"] == 2 and first["coexist"] == 0.5
+    assert first["catch_risk"] == pytest.approx(1.0)  # 40 caught / 40,000 prey-steps
+    assert first["catches_per_predator"] == pytest.approx(2.0)  # 40 / 20,000
+    assert second["catch_risk"] == pytest.approx(4.0)
+    assert second["catches_per_predator"] == pytest.approx(2.0)
+    assert "catch risk" in tournament.format_predator_table(rows, [10, 20])
