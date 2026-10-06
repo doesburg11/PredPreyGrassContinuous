@@ -26,4 +26,12 @@ config_ppo = {
     "tensorboard_dir": str(RUNS_DIR / "{run_name}" / "tensorboard"),
     "checkpoint_dir": str(RUNS_DIR / "{run_name}" / "checkpoint"),
     "checkpoint_every": 10,  # Requires checkpoint_dir; 0 saves only at the end.
+    # Start both policies from a saved checkpoint (a run's checkpoint/ or
+    # checkpoint/iter_<n> directory) instead of from scratch; None: scratch.
+    # Only the network weights are loaded: optimizer state, iteration count
+    # and output directories start fresh, as a new run.
+    "init_checkpoint": None,
+    # Policies kept as loaded and not trained, e.g. ["prey_policy"] to train
+    # predators against fixed prey. Requires init_checkpoint and mode "ps".
+    "frozen_policies": [],
 }

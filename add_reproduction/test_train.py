@@ -245,3 +245,76 @@ def test_make_env_fills_in_required_obs_mode_and_permanent_deaths():
         assert env.get_observation_space("prey_0").shape == (33,)
     finally:
         env.close()
+
+
+def _fake_checkpoint(tmp_path):
+    for policy in ("predator_policy", "prey_policy"):
+        state = train.module_checkpoint(tmp_path, policy)
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "module_state.pkl").touch()
+    return str(tmp_path)
+
+
+def test_frozen_policies_need_a_valid_init_checkpoint(monkeypatch, tmp_path):
+    monkeypatch.setitem(train.config_ppo, "frozen_policies", ["prey_policy"])
+    with pytest.raises(ValueError, match="requires init_checkpoint"):
+        train.load_settings()
+    monkeypatch.setitem(train.config_ppo, "init_checkpoint", str(tmp_path))
+    with pytest.raises(ValueError, match="init_checkpoint has no predator_policy"):
+        train.load_settings()
+    # A policy directory without saved state is rejected too.
+    train.module_checkpoint(tmp_path, "predator_policy").mkdir(parents=True)
+    with pytest.raises(ValueError, match="init_checkpoint has no predator_policy"):
+        train.load_settings()
+    monkeypatch.setitem(train.config_ppo, "init_checkpoint", _fake_checkpoint(tmp_path))
+    _, settings = train.load_settings()
+    assert settings.frozen_policies == ["prey_policy"]
+    for frozen in (["bird_policy"], ["prey_policy", "predator_policy"]):
+        monkeypatch.setitem(train.config_ppo, "frozen_policies", frozen)
+        with pytest.raises(ValueError, match="frozen_policies"):
+            train.load_settings()
+
+
+def test_init_checkpoint_and_frozen_policies_reach_rllib(monkeypatch, tmp_path):
+    captured = []
+
+    class ConfigCaptured(Exception):
+        pass
+
+    def capture(config):
+        captured.append(config)
+        raise ConfigCaptured
+
+    monkeypatch.setattr(train.PPOConfig, "build_algo", capture)
+    monkeypatch.setattr(train.torch, "set_num_threads", lambda n: None)
+    monkeypatch.setitem(train.config_ppo, "init_checkpoint", _fake_checkpoint(tmp_path))
+    monkeypatch.setitem(train.config_ppo, "frozen_policies", ["prey_policy"])
+    with pytest.raises(ConfigCaptured):
+        train.main()
+    config = captured[0]
+    assert set(config.policies_to_train) == {"predator_policy"}
+    specs = config.rl_module_spec.rl_module_specs
+    for policy in ("predator_policy", "prey_policy"):
+        assert specs[policy].load_state_path == str(
+            train.module_checkpoint(tmp_path, policy)
+        )
+
+
+def test_training_from_scratch_trains_both_policies(monkeypatch):
+    captured = []
+
+    class ConfigCaptured(Exception):
+        pass
+
+    def capture(config):
+        captured.append(config)
+        raise ConfigCaptured
+
+    monkeypatch.setattr(train.PPOConfig, "build_algo", capture)
+    monkeypatch.setattr(train.torch, "set_num_threads", lambda n: None)
+    with pytest.raises(ConfigCaptured):
+        train.main()
+    config = captured[0]
+    assert set(config.policies_to_train) == {"predator_policy", "prey_policy"}
+    specs = config.rl_module_spec.rl_module_specs
+    assert all(spec.load_state_path is None for spec in specs.values())

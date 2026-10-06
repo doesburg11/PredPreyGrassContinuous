@@ -74,6 +74,11 @@ def build_policies(mode: str, predator_count: int, prey_count: int):
     raise ValueError(f"Unknown mode: {mode!r} (expected 'il' or 'ps')")
 
 
+def module_checkpoint(checkpoint, policy):
+    """Where a training checkpoint keeps one policy's RLModule state."""
+    return Path(checkpoint) / "learner_group" / "learner" / "rl_module" / policy
+
+
 def load_settings():
     """Copy and validate editable settings without modifying the source dictionaries."""
     env = dict(config_env)
@@ -151,6 +156,29 @@ def load_settings():
         raise ValueError("mode il cannot be used with reproduction; use ps")
     if ppo["checkpoint_every"] and not ppo["checkpoint_dir"]:
         raise ValueError("checkpoint_every requires checkpoint_dir")
+    ppo.setdefault("init_checkpoint", None)
+    ppo["frozen_policies"] = list(ppo.get("frozen_policies") or [])
+    if ppo["init_checkpoint"]:
+        ppo["init_checkpoint"] = os.path.abspath(
+            os.path.expanduser(os.fspath(ppo["init_checkpoint"]))
+        )
+        policies, _ = build_policies(
+            ppo["mode"], env["predator_count"], env["prey_count"]
+        )
+        for policy in sorted(policies):
+            state = module_checkpoint(ppo["init_checkpoint"], policy)
+            if not (state / "module_state.pkl").is_file():
+                raise ValueError(f"init_checkpoint has no {policy}: {state}")
+    if ppo["frozen_policies"]:
+        if not ppo["init_checkpoint"]:
+            raise ValueError("frozen_policies requires init_checkpoint")
+        if ppo["mode"] != "ps":
+            raise ValueError("frozen_policies requires mode ps")
+        unknown = set(ppo["frozen_policies"]) - {"predator_policy", "prey_policy"}
+        if unknown:
+            raise ValueError(f"Unknown frozen_policies: {sorted(unknown)}")
+        if len(set(ppo["frozen_policies"])) == 2:
+            raise ValueError("frozen_policies would leave nothing to train")
     module_name = Path(__file__).resolve().parent.name
     timestamp = datetime.now(ZoneInfo("Europe/Amsterdam")).strftime(
         "%Y-%m-%d_%H-%M-%S_%f"
@@ -212,10 +240,25 @@ def main():
             num_learners=ppo.num_learners,
             num_gpus_per_learner=ppo.num_gpus_per_learner,
         )
-        .multi_agent(policies=policies, policy_mapping_fn=mapping_fn)
+        .multi_agent(
+            policies=policies,
+            policy_mapping_fn=mapping_fn,
+            # Frozen policies still act, with their loaded weights, but the
+            # learner never updates them.
+            policies_to_train=[p for p in policies if p not in ppo.frozen_policies],
+        )
         .rl_module(
             rl_module_spec=MultiRLModuleSpec(
-                rl_module_specs={p: RLModuleSpec() for p in policies},
+                rl_module_specs={
+                    p: RLModuleSpec(
+                        load_state_path=(
+                            str(module_checkpoint(ppo.init_checkpoint, p))
+                            if ppo.init_checkpoint
+                            else None
+                        )
+                    )
+                    for p in policies
+                },
             ),
             model_config=DefaultModelConfig(vf_share_layers=ppo.vf_share_layers),
         )
