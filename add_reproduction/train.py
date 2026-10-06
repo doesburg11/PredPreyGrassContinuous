@@ -1,10 +1,17 @@
 """Train Aquarium agents using the environment and PPO configuration files.
 
 Run from the repository root: .conda/bin/python add_reproduction/train.py
+
+Each run saves what it was started with in <run>/source_code/ (see
+save_source_code), so it can be reproduced later.
 """
 
+import json
 import math
 import os
+import platform
+import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -193,8 +200,91 @@ def load_settings():
     return env, SimpleNamespace(**ppo)
 
 
+SOURCE_FILES = ("*.py", "config/*.py", "README.md", "requirements.txt")
+
+
+def run_directory(ppo):
+    """The run's own folder: the parent of its checkpoint directory (or of
+    its TensorBoard directory without checkpoints), runs/<run>/ by default;
+    None when both outputs are switched off."""
+    for output in (ppo.checkpoint_dir, ppo.tensorboard_dir):
+        if output:
+            return Path(output).parent
+    return None
+
+
+def _command(args, cwd):
+    return subprocess.run(
+        args, cwd=cwd, capture_output=True, text=True, check=True, timeout=60
+    ).stdout
+
+
+def save_source_code(run_dir, env_config, ppo):
+    """Copy what this run was started with to <run_dir>/source_code/:
+
+    - the module's code, configuration, README and requirements (not tests,
+      runs/ or caches);
+    - settings.json: the settings actually used, including changes made in
+      memory by a launcher script;
+    - the launcher script itself, if training was started from outside the
+      module;
+    - git.txt (commit, branch, uncommitted files) and uncommitted.patch;
+    - versions.txt: Python version and `pip freeze`.
+
+    Only the code copy is required; failures of the other parts are printed
+    as warnings and do not stop training."""
+    module_dir = Path(__file__).resolve().parent
+    target = Path(run_dir) / "source_code"
+    target.mkdir(parents=True, exist_ok=True)
+    for pattern in SOURCE_FILES:
+        for path in sorted(module_dir.glob(pattern)):
+            if path.name.startswith("test_") or not path.is_file():
+                continue
+            destination = target / path.relative_to(module_dir)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, destination)
+    settings = {"config_env": env_config, "config_ppo": vars(ppo)}
+    (target / "settings.json").write_text(
+        json.dumps(settings, indent=2, sort_keys=True, default=str) + "\n"
+    )
+    launcher = Path(sys.argv[0]).resolve() if sys.argv and sys.argv[0] else None
+    if (
+        launcher is not None
+        and launcher.suffix == ".py"
+        and launcher.is_file()
+        and launcher.parent != module_dir
+    ):
+        shutil.copy2(launcher, target / f"launcher_{launcher.name}")
+    try:
+        commit = _command(["git", "rev-parse", "HEAD"], module_dir).strip()
+        branch = _command(["git", "rev-parse", "--abbrev-ref", "HEAD"], module_dir)
+        status = _command(["git", "status", "--porcelain"], module_dir)
+        lines = [f"commit: {commit}", f"branch: {branch.strip()}"]
+        lines.append(
+            "uncommitted changes:\n" + status if status else "uncommitted changes: none"
+        )
+        (target / "git.txt").write_text("\n".join(lines) + "\n")
+        diff = _command(["git", "diff", "HEAD"], module_dir)
+        if diff:
+            (target / "uncommitted.patch").write_text(diff)
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"warning: git state not saved: {error}", flush=True)
+    try:
+        freeze = _command([sys.executable, "-m", "pip", "freeze"], module_dir)
+        (target / "versions.txt").write_text(
+            f"python {platform.python_version()} ({sys.executable})\n\n{freeze}"
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"warning: package versions not saved: {error}", flush=True)
+    return target
+
+
 def main():
     env_config, ppo = load_settings()
+    run_dir = run_directory(ppo)
+    if run_dir is not None:
+        saved = save_source_code(run_dir, env_config, ppo)
+        print(f"source code and settings saved to {saved}", flush=True)
     # Keep each sampler and the local learner from starting competing BLAS
     # thread pools. Ray workers inherit these variables when Ray starts.
     for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):

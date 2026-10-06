@@ -20,6 +20,16 @@ use `mode = "ps"` (one policy per species). `il` mode is rejected because a
 policy per individual needs every agent ID in advance, and newborns get IDs
 that no policy was built for.
 
+Each run saves what it was started with in
+`add_reproduction/runs/<run>/source_code/`, before training starts: the
+module's code, `config/` and README (not the tests), `settings.json` with the
+settings actually used (including changes made by a launcher script), a
+launcher script started from outside the module, `git.txt` with the commit and
+any uncommitted files plus `uncommitted.patch` with their changes, and
+`versions.txt` with the Python version and `pip freeze`. To reproduce a run,
+check out its commit, apply the patch if there is one, and train with its
+`settings.json`, or run the copied `train.py` from `source_code/` itself.
+
 ## Reproduction
 
 After movement, catches, grass, energy decay and starvation, every living

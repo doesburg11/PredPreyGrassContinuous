@@ -1,11 +1,25 @@
 """Training configuration regressions, without starting Ray workers."""
 
+import json
 import math
 from pathlib import Path
 
 import pytest
 
 import train
+
+
+@pytest.fixture(autouse=True)
+def outputs_in_tmp(monkeypatch, tmp_path):
+    """Keep every run these tests start (and its source_code copy) out of the
+    real runs/ folder."""
+    for key, folder in (
+        ("checkpoint_dir", "checkpoint"),
+        ("tensorboard_dir", "tensorboard"),
+    ):
+        monkeypatch.setitem(
+            train.config_ppo, key, str(tmp_path / "runs" / "{run_name}" / folder)
+        )
 
 
 def test_learning_defaults():
@@ -318,3 +332,60 @@ def test_training_from_scratch_trains_both_policies(monkeypatch):
     assert set(config.policies_to_train) == {"predator_policy", "prey_policy"}
     specs = config.rl_module_spec.rl_module_specs
     assert all(spec.load_state_path is None for spec in specs.values())
+
+
+def test_source_code_is_saved_with_settings_git_and_versions(tmp_path):
+    env_config, settings = train.load_settings()
+    env_config["prey_count"] = 99  # an in-memory change, as a launcher makes
+    target = train.save_source_code(tmp_path / "run", env_config, settings)
+    assert target == tmp_path / "run" / "source_code"
+    for name in ("train.py", "env_wrapper.py", "grass.py", "README.md"):
+        assert (target / name).is_file()
+    for name in ("config_env.py", "config_ppo.py", "config_eval.py"):
+        assert (target / "config" / name).is_file()
+    assert not list(target.glob("test_*.py"))  # tests are not copied
+    assert not (target / "runs").exists()
+    saved = json.loads((target / "settings.json").read_text())
+    assert saved["config_env"]["prey_count"] == 99
+    assert saved["config_ppo"]["mode"] == settings.mode
+    git = (target / "git.txt").read_text()
+    assert git.startswith("commit: ") and "branch: " in git
+    versions = (target / "versions.txt").read_text()
+    assert versions.startswith("python ") and "torch==" in versions
+
+
+def test_source_code_saves_a_launcher_from_outside_the_module(tmp_path, monkeypatch):
+    launcher = tmp_path / "experiment.py"
+    launcher.write_text("print('launch')\n")
+    monkeypatch.setattr(train.sys, "argv", [str(launcher)])
+    env_config, settings = train.load_settings()
+    target = train.save_source_code(tmp_path / "run", env_config, settings)
+    assert (target / "launcher_experiment.py").read_text() == "print('launch')\n"
+
+
+def test_main_saves_source_code_in_the_run_folder(monkeypatch, tmp_path):
+    class ConfigCaptured(Exception):
+        pass
+
+    def capture(config):
+        raise ConfigCaptured
+
+    monkeypatch.setattr(train.PPOConfig, "build_algo", capture)
+    monkeypatch.setattr(train.torch, "set_num_threads", lambda n: None)
+    with pytest.raises(ConfigCaptured):  # saved before training starts
+        train.main()
+    runs = list((tmp_path / "runs").iterdir())
+    assert len(runs) == 1
+    assert (runs[0] / "source_code" / "settings.json").is_file()
+
+
+def test_no_source_code_without_output_folders(monkeypatch):
+    monkeypatch.setitem(train.config_ppo, "checkpoint_dir", None)
+    monkeypatch.setitem(train.config_ppo, "tensorboard_dir", None)
+    monkeypatch.setitem(train.config_ppo, "checkpoint_every", 0)
+    _, settings = train.load_settings()
+    assert train.run_directory(settings) is None
+    monkeypatch.setitem(train.config_ppo, "tensorboard_dir", "/tmp/x/{run_name}/tb")
+    _, settings = train.load_settings()
+    run_dir = train.run_directory(settings)
+    assert run_dir is not None and run_dir.name.startswith("add_reproduction_")
