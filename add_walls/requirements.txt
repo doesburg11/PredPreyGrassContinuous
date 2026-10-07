@@ -1,0 +1,22 @@
+# Install order matters -- see README.md "Install" section for why.
+#
+# Step 1:
+#   pip install "ray[rllib]==2.58.0" torch --extra-index-url https://download.pytorch.org/whl/cpu
+# Step 2 (marl-aquarium's own pins are stale -- see README):
+#   pip install --no-deps marl-aquarium==0.1.10
+#   pip install pettingzoo==1.24.2 pygame==2.6.1
+#   pip install moviepy==1.0.3
+#
+# Resolved, working versions in the root Conda environment (everything except
+# moviepy came from step 1's resolver, not from marl-aquarium's setup.py pins):
+ray[rllib]==2.58.0
+torch==2.14.0
+gymnasium==1.2.2
+pettingzoo==1.24.2
+marl-aquarium==0.1.10
+moviepy==1.0.3
+numpy==2.4.6
+pygame==2.6.1
+
+# Tests only (`.conda/bin/python -m pytest add_walls` from the repo root):
+pytest==9.1.1

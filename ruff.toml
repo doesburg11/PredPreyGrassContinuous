@@ -1,1 +1,1 @@
-src = ["dying_prey", "add_grass", "add_energy", "add_reproduction"]
+src = ["dying_prey", "add_grass", "add_energy", "add_reproduction", "add_walls"]

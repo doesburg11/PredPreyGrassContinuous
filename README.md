@@ -18,8 +18,47 @@ trained with RLlib's new API stack (RLModule + Learner).
   input. See its [README](add_energy/README.md).
 - [`add_reproduction/`](add_reproduction/) — `add_energy` plus births at an
   energy threshold, populations that change during an episode, PredPreyGrass's
-  starting populations, and its sparse +10-per-birth reward. See its
+  starting populations, its sparse +10-per-birth reward, and grass that grows
+  in clusters that move as the prey graze them. See its
   [README](add_reproduction/README.md).
+- [`add_walls/`](add_walls/) — `add_reproduction` plus walls that block
+  movement and sight, so animals can hide, and observations computed once per
+  decision (about 3.5 times faster). See its [README](add_walls/README.md).
+
+## Grass: from static patches to moving clusters
+
+In every module, grass consists of patches that prey eat when they come
+close. An eaten patch disappears and regrows after a delay. The modules
+differ in where grass grows:
+
+- **`add_grass`, `add_energy`:** patches are scattered at random and always
+  regrow in exactly the same spot, so the food landscape stays fixed for a
+  whole episode.
+- **`add_reproduction`:** grass can grow in **clusters that move**, driven by
+  the prey themselves through two mechanisms modeled on vegetation ecology:
+  - **Seed dispersal:** an eaten patch regrows next to a surviving patch of
+    its own cluster. Grass spreads where it survives and retreats where it
+    is eaten, so a cluster creeps away from heavy grazing.
+  - **Overgrazing:** a cluster grazed completely bare dies back and, after a
+    delay, regrows in a different, unoccupied part of the arena.
+
+  Together these create a shifting food landscape: prey must keep finding
+  food, and predators can learn where prey gather. Each mechanism has its
+  own switch, alongside scattered placement and random regrowth, so static
+  and moving grass can be compared. The
+  [add_reproduction README](add_reproduction/README.md#grass) describes the
+  mechanisms step by step, with all settings.
+
+## Walls: places to hide
+
+`add_walls` adds **walls**: obstacles that block both movement and sight, as
+in PredPreyGrass's walls-and-occlusion experiments. Animals
+slide along walls instead of passing through them. Anything behind a wall is
+hidden from view, so prey can hide and predators can ambush. Every agent
+senses nearby walls through a few distance inputs. Layouts include a "forest"
+of square blocks, four rooms connected by doorways, and custom rectangles.
+Walls are switched on with `walls_layout`. See the
+[add_walls README](add_walls/README.md#walls) for how they work.
 
 All subprojects share one Conda environment at the repo root (`.conda/`).
 Training settings live in each module's `config/config_env.py` and
