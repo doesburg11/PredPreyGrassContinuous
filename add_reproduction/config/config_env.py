@@ -27,6 +27,8 @@ config_env = {
     # does. A sub-step with a birth ends its decision early (see README).
     "action_repeat": 8,
     "obs_stack": 1,
+    # 48 actions: direction + 16 * speed index (0: full, 1: half, 2: stop).
+    "target_speed_actions": True,
     # Movement. Prey speed raised to the predators' 5, as in PredPreyGrass.
     # Speeds are in units per physics step;
     # the energy time scale assumes ~4-5 (one ~32-unit grid cell per ~8 steps).
@@ -90,6 +92,13 @@ config_env = {
     "energy_prey_max": 16.0,
     "energy_predator_decay": 0.15 / 8,  # Lost per physics step.
     "energy_prey_decay": 0.05 / 8,
+    # Per physics step: resting decay + speed_cost * speed^2
+    # + acceleration_cost * change_in_velocity^2 (actual arena units).
+    # Full speed adds half the resting cost; these are initial tuning values.
+    "energy_predator_speed_cost": 0.15 / 8 / (2 * 5**2),
+    "energy_prey_speed_cost": 0.05 / 8 / (2 * 5**2),
+    "energy_predator_acceleration_cost": 0.001875,
+    "energy_prey_acceleration_cost": 0.000625,
     "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
     # Share of a caught prey's energy the catching predator gains (PPG: 1.0).
     "energy_catch_efficiency_predator": 0.5,

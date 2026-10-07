@@ -399,3 +399,40 @@ Tests:
 
 Run each module's tests separately: these independent experiment copies use
 the same flat module names.
+
+
+## Direction and target speed
+
+New training configurations enable `target_speed_actions = True`. Each
+agent has 48 categorical actions: 16 arena directions at three target speeds.
+Encode an action as `direction + 16 * speed_index`, with speed index 0 for
+full speed, 1 for half speed, and 2 for stopped. For example, action 4 moves
+right at full speed, 20 moves right at half speed, and 36 brakes to a stop.
+Stopping ignores the direction. Acceleration and braking are limited by the
+species' configured maximum acceleration; agents do not control acceleration
+separately. Existing scripted direction policies continue to request full speed.
+Random evaluation samples all 48 actions, and PPO learns a categorical policy
+over all direction/speed combinations.
+
+Energy loss is charged after movement on every physics step:
+
+```text
+resting decay + speed coefficient * actual speed squared
+              + acceleration coefficient * actual change in velocity squared
+```
+
+The coefficients are `energy_predator_speed_cost`, `energy_prey_speed_cost`,
+`energy_predator_acceleration_cost`, and `energy_prey_acceleration_cost`.
+Braking, turns and collision-induced changes in velocity also count. In
+`add_walls`, speed is measured after wall collision resolution, so a stationary
+animal pushing against a wall pays no travelling cost. Repeated decisions
+pay separately for each physics step. Defaults make steady full-speed travel
+add half the existing resting decay, plus any acceleration cost; these are
+initial tuning values, not experimentally calibrated rates.
+
+Checkpoint evaluation uses the checkpoint's saved environment settings.
+Older configurations omit the toggle and movement coefficients, retaining
+16 direction-only actions and fixed metabolic decay. New 48-action training
+requires new policies rather than loading the old 16-action network weights.
+To run legacy movement explicitly, set `target_speed_actions = False` and
+all four movement-energy coefficients to zero.

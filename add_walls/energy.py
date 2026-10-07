@@ -33,6 +33,10 @@ class EnergyLayer:
         prey_max=8.0,
         predator_decay=0.15 / 8,
         prey_decay=0.05 / 8,
+        predator_speed_cost=0.0,
+        prey_speed_cost=0.0,
+        predator_acceleration_cost=0.0,
+        prey_acceleration_cost=0.0,
         grass_gain=2.0,
         catch_efficiency_predator=1.0,
     ):
@@ -43,6 +47,10 @@ class EnergyLayer:
             "prey_max": (prey_max, True),
             "predator_decay": (predator_decay, False),
             "prey_decay": (prey_decay, False),
+            "predator_speed_cost": (predator_speed_cost, False),
+            "prey_speed_cost": (prey_speed_cost, False),
+            "predator_acceleration_cost": (predator_acceleration_cost, False),
+            "prey_acceleration_cost": (prey_acceleration_cost, False),
             "grass_gain": (grass_gain, False),
             "catch_efficiency_predator": (catch_efficiency_predator, False),
         }
@@ -68,6 +76,11 @@ class EnergyLayer:
         self.initial = {"predator": predator_initial, "prey": prey_initial}
         self.max = {"predator": predator_max, "prey": prey_max}
         self.decay = {"predator": predator_decay, "prey": prey_decay}
+        self.speed_cost = {"predator": predator_speed_cost, "prey": prey_speed_cost}
+        self.acceleration_cost = {
+            "predator": predator_acceleration_cost,
+            "prey": prey_acceleration_cost,
+        }
         self.grass_gain = grass_gain
         self.catch_efficiency_predator = catch_efficiency_predator
 
@@ -158,6 +171,10 @@ def patch_energy(raw_env, **settings):
         infos.setdefault(agent, {})["starved"] = True
 
     def step(actions):
+        previous_velocity = {
+            entity.id(): entity.velocity.copy()
+            for entity in raw_env.predators + raw_env.prey
+        }
         obs, rewards, terms, truncs, infos = original_step(actions)
         for predator, prey_energy in catches:
             if predator.alive:
@@ -169,7 +186,15 @@ def patch_energy(raw_env, **settings):
                 layer.gain(prey, eaten * layer.grass_gain)
         living = raw_env.predators + raw_env.prey
         for entity in living:
-            entity.energy = layer.energy(entity) - layer.decay[species_of(entity)]
+            species = species_of(entity)
+            delta = entity.velocity.copy()
+            delta.sub(previous_velocity[entity.id()])
+            cost = (
+                layer.decay[species]
+                + layer.speed_cost[species] * entity.velocity.mag() ** 2
+                + layer.acceleration_cost[species] * delta.mag() ** 2
+            )
+            entity.energy = layer.energy(entity) - cost
         starved = [entity for entity in living if entity.energy <= 0]
         for entity in starved:
             starve(entity, obs, terms, truncs, infos)
