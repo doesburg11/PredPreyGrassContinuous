@@ -167,17 +167,35 @@ class GrassLayer:
         """A random point in the middle half of a grid cell."""
         columns, rows = self.grid()
         cell_w, cell_h = self.env.width / columns, self.env.height / rows
-        return Vector(
-            (cell % columns + self.rng.uniform(0.25, 0.75)) * cell_w,
-            (cell // columns + self.rng.uniform(0.25, 0.75)) * cell_h,
-        )
+        walls = getattr(self.env, "walls", None)
+        for _ in range(100):
+            position = Vector(
+                (cell % columns + self.rng.uniform(0.25, 0.75)) * cell_w,
+                (cell // columns + self.rng.uniform(0.25, 0.75)) * cell_h,
+            )
+            if walls is None or not walls.inside(position.x, position.y):
+                return position
+        left, top = cell % columns * cell_w, cell // columns * cell_h
+        return Vector(*walls.sample_open(
+            self.rng, (left, top, left + cell_w, top + cell_h)
+        ))
 
     def cluster_centres(self):
         """One centre per cluster, each in its own grid cell, so clusters are
         spread out."""
         columns, rows = self.grid()
-        cells = self.rng.sample(range(columns * rows), self.cluster_count)
-        return [self.centre_in(cell) for cell in cells]
+        if getattr(self.env, "walls", None) is None:
+            cells = self.rng.sample(range(columns * rows), self.cluster_count)
+            return [self.centre_in(cell) for cell in cells]
+        centres = []
+        for cell in self.rng.sample(range(columns * rows), columns * rows):
+            try:
+                centres.append(self.centre_in(cell))
+            except ValueError:  # this grid cell is entirely covered by walls
+                continue
+            if len(centres) == self.cluster_count:
+                return centres
+        raise ValueError("walls leave no usable space for all grass clusters in distinct grid cells")
 
     def near(self, position, spread):
         """A point scattered around position (wrapped across the edges)."""
@@ -189,9 +207,9 @@ class GrassLayer:
     def spot(self, cluster=None):
         """A random patch position: uniform over the arena, or scattered
         around a cluster's centre (wrapped across the arena's edges). Spots
-        inside walls are redrawn, up to 100 times; a cluster centre deep
-        inside a large wall could in principle exhaust that, and the last
-        draw is then used."""
+        inside walls are redrawn, up to 100 times. On exhaustion a cluster
+        centre relocates within its cell; uniform placement samples open
+        area directly. No blocked position is accepted."""
         width, height = self.env.width, self.env.height
         walls = getattr(self.env, "walls", None)
 
@@ -203,9 +221,15 @@ class GrassLayer:
         position = draw()
         for _ in range(99):
             if walls is None or not walls.inside(position.x, position.y):
-                break
+                return position
             position = draw()
-        return position
+        if walls is None or not walls.inside(position.x, position.y):
+            return position
+        if cluster is not None:
+            self.centres[cluster] = self.centre_in(self.cell_of(self.centres[cluster]))
+            # The new centre is itself a valid seed-bank location.
+            return self.centres[cluster].copy()
+        return Vector(*walls.sample_open(self.rng))
 
     def available(self, patch):
         return patch.ready_at <= self.tick
@@ -267,6 +291,8 @@ class GrassLayer:
                         patch.position.x, patch.position.y
                     ):
                         break
+                else:
+                    patch.position = self.spot(patch.cluster)
             else:  # nothing left to seed from: regrow from the seed bank
                 patch.position = self.spot(patch.cluster)
         elif patch.regrow == "centre":
@@ -297,7 +323,16 @@ class GrassLayer:
         if not free:  # every cell taken: any cell but its own
             own = self.cell_of(self.centres[cluster])
             free = [cell for cell in range(columns * rows) if cell != own] or [own]
-        self.centres[cluster] = self.centre_in(self.rng.choice(free))
+        if getattr(self.env, "walls", None) is None:
+            self.centres[cluster] = self.centre_in(self.rng.choice(free))
+        else:
+            for cell in self.rng.sample(free, len(free)):
+                try:
+                    self.centres[cluster] = self.centre_in(cell)
+                    break
+                except ValueError:  # blocked cells cannot receive a cluster
+                    continue
+            # No destination is open: retain the existing open seed bank.
         # The whole cluster regrows together, also patches eaten earlier.
         regrows = self.tick + self.overgrazing_delay
         for patch in members:

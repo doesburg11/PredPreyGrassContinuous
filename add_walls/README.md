@@ -306,7 +306,15 @@ of PredPreyGrass's `walls_occlusion` experiments. Walls are off by default
   also the boundary at the bottom, and the left wall is also the boundary at
   the right.
 - `"custom"`: your own rectangles in `walls_rectangles`, as
-  `(x, y, width, height)` in arena units.
+  `(x, y, width, height)` in arena units. All four values must be finite;
+  sizes cannot exceed the arena dimensions. Origins wrap into the arena,
+  and rectangles crossing an edge continue on the opposite side.
+
+Grass cluster centres are placed in open space, skipping fully blocked grid
+cells. If too few open cells remain for distinct clusters, placement raises
+a clear error. Failed patch or dispersal sampling falls back to an open
+seed-bank location or direct sampling of open area. A collapsed cluster
+keeps its existing seed bank if all eligible destination cells are blocked.
 
 Walls do three things:
 

@@ -1,6 +1,7 @@
 """Walls: layouts, blocked movement, occlusion, wall sensing, integration."""
 
 from types import SimpleNamespace
+import random
 
 import numpy as np
 import pytest
@@ -231,3 +232,62 @@ def test_observations_are_taken_after_walls_move_animals():
         assert obs["prey_0"][0] == pytest.approx(0.0)  # no speed into the wall
     finally:
         env.close()
+
+
+@pytest.mark.parametrize("field", range(4))
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_custom_rectangles_reject_nonfinite_values(field, value):
+    rect = [380, 100, 40, 600]
+    rect[field] = value
+    with pytest.raises(ValueError, match="finite"):
+        Walls(arena(), layout="custom", rectangles=[rect])
+
+
+@pytest.mark.parametrize("size", [(801, 40), (40, 801)])
+def test_custom_rectangles_reject_sizes_larger_than_arena(size):
+    with pytest.raises(ValueError, match="larger than the arena"):
+        Walls(arena(), layout="custom", rectangles=[(0, 0, *size)])
+
+
+@pytest.mark.parametrize("offset", [-1600, 1600])
+def test_custom_rectangles_wrap_consistently(offset):
+    reference = Walls(arena(), layout="custom", rectangles=ONE_WALL)
+    wrapped = Walls(arena(), layout="custom", rectangles=[(380 + offset, 100 + offset, 40, 600)])
+    np.testing.assert_array_equal(wrapped.rects, reference.rects)
+    np.testing.assert_array_equal(wrapped.visible, reference.visible)
+    body = animal(370, 300, vx=5)
+    assert wrapped.inside(390, 300)
+    assert wrapped.overlapping([body]) == [0]
+    np.testing.assert_array_equal(wrapped.ray_distances(body, 200), reference.ray_distances(body, 200))
+    wrapped.push_out(body)
+    assert body.position.x == pytest.approx(364)
+
+
+def test_edge_crossing_custom_rectangle_wraps():
+    walls = Walls(arena(), layout="custom", rectangles=[(790, 300, 40, 200)], occlusion=False)
+    assert walls.inside(5, 400)
+    body = animal(35, 400, vx=-5)
+    assert walls.overlapping([body]) == [0]
+    assert walls.ray_distances(body, 200)[6] == pytest.approx(5 / 200)
+    walls.push_out(body)
+    assert body.position.x == pytest.approx(46)
+
+
+@pytest.mark.parametrize("rect,bounds", [
+    ((100, 100, 40, 100), (100, 100, 180, 200)),
+    ((790, 300, 40, 200), (0, 300, 80, 500)),
+])
+def test_sample_open_in_partially_blocked_bounded_region(rect, bounds):
+    walls = Walls(arena(), layout="custom", rectangles=[rect], occlusion=False)
+    rng = random.Random(0)
+    for _ in range(100):
+        x, y = walls.sample_open(rng, bounds)
+        assert bounds[0] <= x <= bounds[2]
+        assert bounds[1] <= y <= bounds[3]
+        assert not walls.inside(x, y)
+
+
+def test_sample_open_rejects_fully_blocked_bounded_region():
+    walls = Walls(arena(), layout="custom", rectangles=ONE_WALL, occlusion=False)
+    with pytest.raises(ValueError, match="no usable space"):
+        walls.sample_open(random.Random(0), (385, 200, 415, 300))

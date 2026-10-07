@@ -8,6 +8,70 @@ from marl_aquarium.env.vector import Vector
 
 from env_wrapper import _patch_torus_view, make_env
 from grass import GrassLayer, GrassPatch
+from walls import Walls
+
+
+@pytest.mark.parametrize("layout,seed", [("blocks", 1), ("chambers", 4)])
+def test_narrow_clusters_keep_centres_and_patches_out_of_walls(raw, layout, seed):
+    raw.walls = Walls(raw, layout=layout, occlusion=False)
+    layer = GrassLayer(raw, count=100, clustered=True, cluster_count=5, cluster_spread=1)
+    layer.reset(seed=seed)
+    for position in layer.centres + [p.position for p in layer.patches]:
+        assert not raw.walls.inside(position.x, position.y)
+
+
+def test_blocked_cluster_relocates_after_failed_placement(raw, monkeypatch):
+    raw.walls = Walls(raw, layout="blocks", occlusion=False)
+    layer = GrassLayer(raw, count=1, clustered=True, cluster_count=1)
+    layer.centres = [Vector(100, 100)]
+    monkeypatch.setattr(layer, "near", lambda *args: Vector(100, 100))
+    position = layer.spot(0)
+    assert not raw.walls.inside(position.x, position.y)
+    assert not raw.walls.inside(layer.centres[0].x, layer.centres[0].y)
+
+
+def test_failed_dispersal_uses_open_seed_bank(raw, monkeypatch):
+    raw.walls = Walls(raw, layout="blocks", occlusion=False)
+    layer = GrassLayer(raw, count=2, clustered=True, cluster_count=1, dispersal=True)
+    layer.reset(seed=0)
+    patch = layer.patches[0]
+    patch.regrow = "disperse"
+    monkeypatch.setattr(layer, "near", lambda *args: Vector(100, 100))
+    layer.place(patch)
+    assert patch.regrow is None
+    assert not raw.walls.inside(patch.position.x, patch.position.y)
+
+
+def test_fully_blocked_arena_rejects_grass_placement(raw):
+    raw.walls = Walls(raw, layout="custom", rectangles=[(0, 0, 800, 800)], occlusion=False)
+    for clustered in (False, True):
+        layer = GrassLayer(raw, count=1, clustered=clustered, cluster_count=1)
+        with pytest.raises(ValueError, match="no usable space"):
+            layer.reset(seed=0)
+
+
+def test_uniform_placement_falls_back_to_small_open_region(raw, monkeypatch):
+    raw.walls = Walls(raw, layout="custom", rectangles=[(0, 0, 799, 800)], occlusion=False)
+    layer = GrassLayer(raw, count=1)
+    # Force rejection draws to land inside the wall; direct sampling still succeeds.
+    original_uniform = layer.rng.uniform
+    monkeypatch.setattr(layer.rng, "uniform", lambda low, high: 400 if (low, high) == (0, 800) else original_uniform(low, high))
+    position = layer.spot()
+    assert 799 <= position.x <= 800
+    assert not raw.walls.inside(position.x, position.y)
+
+
+def test_clusters_skip_fully_blocked_grid_cells(raw):
+    # Five clusters use a 3x2 grid; one fully blocked cell leaves five open.
+    raw.walls = Walls(raw, layout="custom", rectangles=[(0, 0, 800 / 3, 400)], occlusion=False)
+    layer = GrassLayer(raw, count=10, clustered=True, cluster_count=5)
+    layer.reset(seed=1)
+    assert len({layer.cell_of(c) for c in layer.centres}) == 5
+    assert all(not raw.walls.inside(c.x, c.y) for c in layer.centres)
+    # The only unoccupied destination is blocked: keep an open seed bank.
+    old = layer.centres[0].copy()
+    layer.collapse(0, [p for p in layer.patches if p.cluster == 0])
+    assert layer.centres[0].x == old.x and layer.centres[0].y == old.y
 
 
 def prey(agent, x, y, alive=True):

@@ -114,9 +114,14 @@ class Walls:
             layout_rectangles(layout, self.width, self.height, thickness, rectangles),
             dtype=np.float64,
         ).reshape(-1, 4)
+        if not np.isfinite(self.rects).all():
+            raise ValueError("wall rectangle coordinates and sizes must be finite")
         if np.any(self.rects[:, 2:] < 16):
             # Thinner walls could be crossed between two collision checks.
             raise ValueError("wall rectangles must be at least 16 units wide and high")
+        if np.any(self.rects[:, 2:] > [self.width, self.height]):
+            raise ValueError("wall rectangles must not be larger than the arena")
+        self.rects[:, :2] %= [self.width, self.height]
         self.occlusion = occlusion
         self.rays = rays
         self.cell = visibility_cell
@@ -134,6 +139,32 @@ class Walls:
         self.visible = self.visibility_table() if occlusion else None
 
     # Geometry ---------------------------------------------------------------
+
+    def sample_open(self, rng, bounds=None):
+        """Sample open area exactly, also when rejection sampling fails.
+
+        Wall edges partition the region into rectangles wholly open or
+        covered. Weight open rectangles by area to sample uniformly.
+        """
+        left, top, right, bottom = bounds or (0, 0, self.width, self.height)
+        xs = sorted({left, right} | {
+            float(edge) for x, _, w, _ in self.images
+            for edge in (x, x + w) if left < edge < right
+        })
+        ys = sorted({top, bottom} | {
+            float(edge) for _, y, _, h in self.images
+            for edge in (y, y + h) if top < edge < bottom
+        })
+        regions, areas = [], []
+        for x1, x2 in zip(xs, xs[1:]):
+            for y1, y2 in zip(ys, ys[1:]):
+                if not self.inside((x1 + x2) / 2, (y1 + y2) / 2):
+                    regions.append((x1, y1, x2, y2))
+                    areas.append((x2 - x1) * (y2 - y1))
+        if not regions:
+            raise ValueError("walls leave no usable space for grass in this region")
+        x1, y1, x2, y2 = rng.choices(regions, weights=areas, k=1)[0]
+        return rng.uniform(x1, x2), rng.uniform(y1, y2)
 
     def inside(self, x, y, margin=0.0):
         """Whether a point lies in (or within margin of) a wall."""
