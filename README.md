@@ -20,7 +20,9 @@ trained with RLlib's new API stack (RLModule + Learner).
   energy threshold, populations that change during an episode, PredPreyGrass's
   starting populations, its sparse +10-per-birth reward, and grass that grows
   in clusters that move as the prey graze them. See its
-  [README](add_reproduction/README.md).
+  [README](add_reproduction/README.md), and its
+  [RESULTS](add_reproduction/RESULTS.md) for the log of all training runs
+  and what they showed.
 - [`add_walls/`](add_walls/) — `add_reproduction` plus walls that block
   movement and sight, so animals can hide, and observations computed once per
   decision (about 3.5 times faster). See its [README](add_walls/README.md).
