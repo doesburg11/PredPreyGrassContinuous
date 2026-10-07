@@ -41,7 +41,8 @@ number comes from an evaluation whose output was not saved, it is marked
 | I | `2026-10-06_22-25-55_664977` | H final | 1,000 | continuation of H | completed |
 | J | `2026-10-07_09-38-10_103867` | I final | 1,000 | continuation of I | completed |
 | K | `2026-10-07_15-34-38_396259` | J final | 517 | prey faster than predators (5.5 vs 5) | stopped |
-| L | `2026-10-07_18-42-19_138184` | scratch | in progress | moving grass, predators see grass | running |
+| L | `2026-10-07_18-42-19_138184` | scratch | 1,000 | moving grass, predators see grass | completed |
+| M | `2026-10-07_21-26-01_880217` | L final | 3,000 (planned) | continuation of L | running |
 
 Common to all runs: 6 predators and 8 prey at the start, 100 grass patches,
 `max_time_steps = 8000`, `action_repeat = 8`, sparse rewards (+10 per birth,
@@ -280,7 +281,7 @@ prey's strategy is to keep roaming fast and head for visible grass. Their
 policies have no memory and cannot see regrowing patches, so they cannot
 learn specific spots.
 
-## 8. Predators see grass (run L, in progress)
+## 8. Predators see grass (run L)
 
 `grass_predators_observe` gives predators the same nearest-grass input as
 prey, as in PredPreyGrass, where both species see grass. Otherwise run L
@@ -296,10 +297,34 @@ long as run H's:
 | 401–500 | 9.5 / 62, 174 | 6.2 / 36, 92 |
 | 501–566 | 10.6 / 71, 200 | 6.4 / 38, 100 |
 
-Shorter episodes with fewer prey births suggest that predators which can see
-grass drive the prey extinct faster, which would be the first sign of
-predators using new information. Preliminary: it needs a final check, and a
-comparison with run H at 1,000 iterations, when run L finishes.
+The gap persisted to the end of training (about 100 against 200 decisions
+at iterations 501–600).
+
+**Final check, run L:** the prey died out in 20 of 20 episodes, after 1,178
+physics steps on average (run H: 1,802), with a catch risk of 7.78 (run H:
+5.35), 7.7 prey and 8.2 predators alive on average, and 5.4 predators
+starving per episode (run H: 10.2).
+
+Both runs also trained their prey, so the final checks alone cannot tell
+whether L's predators improved or L's prey learned less. Prey observations
+are the same in both runs, so both runs' final predators were played against
+**the same prey** (run H's final prey), each in its own environment, 20
+episodes each (analysis script outside the repository):
+
+| Against run H's final prey | Run H's predators (blind to grass) | Run L's predators (see grass) |
+|---|---:|---:|
+| Prey died out | 19 of 20 | 20 of 20 |
+| Length (physics steps) | 1,802 | 1,149 |
+| Catch risk | 5.35 | **7.18** (+34%) |
+| Predators starved per episode | 10.2 | 7.0 |
+
+The run H row reproduces run H's final check exactly. With the prey held
+fixed, predators that see grass catch about a third more effectively and
+starve less: **the first clear predator improvement in these experiments.**
+Unlike freezing the prey (F), a catch reward (G) or faster prey (K), grass
+vision gave the predators information worth learning from, most likely where
+prey come to eat. The ecosystem became less balanced as a result, as prey
+need many more iterations to adapt.
 
 ## Findings so far
 
@@ -313,17 +338,19 @@ comparison with run H at 1,000 iterations, when run L finishes.
 3. **Predators sit at energy break-even.** About 8 catches per predator per
    1,000 steps in every run, checkpoint and strategy. Predator numbers
    adjust to prey availability; individual skill barely changes the rate.
-4. **The predators' ceiling is set by the setup.** Scripted pursuit does
-   about as well as the learned predators; only lead pursuit is clearly
-   better (~15%). Freezing the prey (F), adding a catch reward (G) and
-   faster prey (K) did not make predators improve.
+4. **The predators' ceiling is set by what they can perceive.** Scripted
+   pursuit does about as well as the learned predators; only lead pursuit
+   is clearly better (~15%). Freezing the prey (F), adding a catch reward
+   (G) and faster prey (K) did not make predators improve, but letting them
+   see grass (L) did: 34% higher catch risk against the same prey.
 5. **Moving grass is a harder, still learnable world for prey:** 0, 4 and 8
    of 20 coexisting after 1,000, 2,000 and 3,000 iterations.
 
 ## Open questions and next steps
 
-- **Run L:** do predators that see grass learn to hunt better (final check,
-  tournament, scripted benchmark)?
+- **Continue run L** (as H was continued by I and J): do the prey catch up
+  with predators that see grass, and do both species now keep adapting to
+  each other (tournament)?
 - **Walls** (`add_walls`): hiding and ambush through blocked movement and
   sight.
 - **Group hunting:** catches that need, or are easier with, several
