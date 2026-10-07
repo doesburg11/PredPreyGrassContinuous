@@ -75,6 +75,10 @@ config_env = {
     "grass_overgrazing": True,
     "grass_overgrazing_threshold": 0.0,
     "grass_overgrazing_delay": 400,
+    # Predators also observe the nearest available patch in their view cone
+    # (4 inputs, like prey), as in PredPreyGrass, where both species see
+    # grass. False keeps predators blind to grass (runs before this setting).
+    "grass_predators_observe": True,
     # Energy, in PredPreyGrass base_environment units. Its per-step rates are
     # divided by 8: crossing this arena takes ~8x as many steps as its 25x25
     # grid (800 units at 4-5 units/step vs 25 cells at 1 cell/step).

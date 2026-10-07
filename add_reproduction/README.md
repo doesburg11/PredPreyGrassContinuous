@@ -127,7 +127,9 @@ decisions at the same training stage.
 
 Episodes start with 6 predators and 8 prey, as in PredPreyGrass. One 25x25
 grid cell corresponds to about 32 units of this 800-unit arena, so
-PredPreyGrass's 100 grass cells become `grass_count = 100` patches.
+PredPreyGrass's 100 grass cells become `grass_count = 100` patches. By
+default the grass grows in 5 clusters that move as the prey graze them (see
+Grass below).
 
 ## Energy settings
 
@@ -159,24 +161,140 @@ terminated. If the predators are gone, the surviving prey are truncated.
 
 ## Grass
 
-| Setting | Default | Meaning |
-|---|---:|---|
-| `grass_count` | 100 | Number of stationary patches; 0 disables grass |
-| `grass_consume_radius` | 12 | Toroidal distance within which prey eat a patch |
-| `grass_food_reward` | 0 | Reward per patch, before global reward scaling |
-| `grass_respawn_delay` | 400 | Physics steps before a consumed patch regrows |
+Grass is the prey's only food. It consists of `grass_count` patches. A patch
+is either available (visible, edible) or regrowing (hidden). The closest
+living prey within `grass_consume_radius` of an available patch eats it and
+gains `energy_grass_gain` energy. The patch is then hidden for
+`grass_respawn_delay` physics steps before it regrows. Prey observe the
+nearest *available* patch in their view cone (4 inputs). With
+`grass_predators_observe`, predators observe it in their own view cone as
+well, as in PredPreyGrass, where both species see grass. This lets them
+learn, for example, to wait where prey come to eat.
 
-Each available patch is eaten by the closest living prey within its radius,
-and regrows in place.
+Grass can be static, as in earlier modules, or it can move: settings choose
+where patches start and where an eaten patch regrows. The default
+configuration (`config/config_env.py`) uses **moving clusters**: clustered
+placement, seed dispersal and overgrazing, all three switched on.
+
+### 1. Starting layout: scattered or clustered
+
+- `grass_clustered = False`: patches are scattered uniformly over the arena.
+- `grass_clustered = True`: patches are grouped in `grass_cluster_count`
+  clusters. The arena is divided into a grid with at least that many cells
+  (3 x 2 for 5 clusters, 4 x 3 for 10 on a square arena). Each cluster
+  centre is placed in its own randomly chosen cell, anywhere in the middle
+  half of it, so clusters start spread out instead of bunching together.
+  Patches are split evenly over the clusters (100 patches in 5 clusters gives
+  20 each). They are scattered around their centre with normal offsets of
+  standard deviation `grass_cluster_spread`, wrapped across the arena's
+  edges.
+
+Each episode draws a new layout.
+
+### 2. Where an eaten patch regrows
+
+Exactly one of these applies:
+
+- **In place** (default when the switches below are off): the patch regrows
+  in exactly the same spot.
+- **Random respawn** (`grass_random_respawn = True`): the patch regrows at a
+  new random spot, within its own cluster when clustered (so clusters
+  persist), and anywhere in the arena otherwise.
+- **Seed dispersal** (`grass_dispersal = True`, requires `grass_clustered`,
+  excludes `grass_random_respawn`): when the patch regrows, it appears next to
+  a randomly chosen living patch of its own cluster, scattered by normal
+  offsets of standard deviation `grass_dispersal_distance`. The new position
+  is chosen at the moment of regrowth, so it follows wherever the cluster
+  currently has grass. If the cluster has no living patch left, the patch
+  regrows around the cluster centre instead, like seed from the soil's seed
+  bank.
+
+Seed dispersal makes clusters move gradually. Where prey graze heavily, a
+cluster loses patches and nothing regrows there. Regrowth happens next to the
+patches that survive, so a cluster creeps away from the side where it is
+being eaten, without any imposed direction.
+
+### 3. Overgrazing: clusters that are grazed bare move away
+
+With `grass_overgrazing = True` (requires `grass_clustered`), a cluster that
+is grazed down to `grass_overgrazing_threshold` or less of its patches
+(0.0: grazed completely bare) collapses:
+
+1. Its remaining patches, if any, die back too.
+2. Its centre moves to a grid cell that no other cluster uses (if every cell
+   is taken, to any cell other than its own).
+3. After `grass_overgrazing_delay` physics steps, all its patches regrow
+   together, scattered around the new centre.
+4. It cannot collapse again until it has recovered above the threshold.
+
+Overgrazing produces sudden relocations, where dispersal produces gradual
+drift.
+
+### Moving clusters together
+
+With clustering, dispersal and overgrazing combined, the prey shape where
+their food goes. Grazing pushes clusters away gradually through dispersal,
+and stripping a cluster bare sends it to another part of the arena. A
+cluster that is grazed lightly stays where it is. Prey that overgraze lose
+their food for a while and have to find where it reappears. Predators can
+use this: prey gather where grass is. Ecologically, the two mechanisms
+correspond to vegetation spreading by seed dispersal and to the shifting
+mosaic of grazed and recovering patches in rangelands.
+
+In a test with policies trained on static grass, each cluster was grazed
+bare and relocated roughly every 500 steps. Moving grass is a harder world.
+Policies trained on it kept both species alive to the time limit in 0 of 20
+evaluated episodes after 1,000 iterations and in 4 of 20 after 2,000, still
+improving, against 18 of 20 for static grass.
+
+### Settings
+
+Values as set in `config/config_env.py`. If a switch is left out of the
+configuration, it is off.
+
+| Setting | Value | Meaning |
+|---|---:|---|
+| `grass_count` | 100 | Number of patches; 0 disables grass |
+| `grass_consume_radius` | 12 | Distance within which a prey eats a patch |
+| `grass_food_reward` | 0 | Reward per patch, before global reward scaling |
+| `grass_respawn_delay` | 400 | Physics steps before an eaten patch regrows |
+| `grass_clustered` | True | Clusters instead of uniform placement |
+| `grass_cluster_count` | 5 | Number of clusters |
+| `grass_cluster_spread` | 48.0 | Scatter of patches around a cluster centre (sd, units) |
+| `grass_random_respawn` | False | Regrow at a random spot (in its cluster when clustered) |
+| `grass_dispersal` | True | Regrow next to a living patch of the cluster |
+| `grass_dispersal_distance` | 24.0 | Scatter around that patch (sd, units) |
+| `grass_overgrazing` | True | Clusters grazed down to the threshold relocate |
+| `grass_overgrazing_threshold` | 0.0 | Share of a cluster's patches at or below which it collapses |
+| `grass_overgrazing_delay` | 400 | Physics steps before a collapsed cluster regrows elsewhere |
+| `grass_predators_observe` | True | Predators also observe the nearest visible patch (4 inputs) |
+
+For scale: one PredPreyGrass grid cell is about 32 units, so the spread of 48
+is 1.5 cells and the dispersal distance of 24 is 0.75 cells. The regrowth
+delay of 400 physics steps equals 50 grid steps, the time PredPreyGrass's
+grass needs to regrow fully.
+
+The grass layer uses its own random generator, seeded from the episode seed,
+for layouts, relocations and regrowth positions. The same seed and the same
+animal behavior therefore always give the same grass history, and grass
+randomness does not change Aquarium's own random stream.
+
+To test a policy trained on one kind of grass in another, use
+`env_overrides` in `config/config_eval.py`, for example
+`{"grass_dispersal": False, "grass_overgrazing": False}`. A checkpoint
+otherwise always runs with the grass settings it was trained with.
 
 ## Observations and display
 
-Agents observe the egocentric layout from `dying_prey`. Prey also observe
-the nearest visible grass patch (4 values), and every agent observes its own
-energy as a fraction of its cap (1 value). Prey inputs are 33 values and
-predator inputs are 29 values, before observation stacking. Checkpoints from
-earlier modules cannot be used here, because their rewards and populations
-differ.
+Agents observe the egocentric layout from `dying_prey` (28 values). Prey
+also observe the nearest visible grass patch (4 values), and so do predators
+with `grass_predators_observe` (on in `config_env.py`). Every agent observes
+its own energy as a fraction of its cap (1 value). Both species therefore have
+33 inputs, before observation stacking. Runs trained before
+`grass_predators_observe` existed have 29 predator inputs, and their
+checkpoints keep that layout, because a missing setting means off.
+Checkpoints from earlier modules cannot be used here, because their rewards
+and populations differ.
 
 The viewer draws grass under the animals and an energy bar above each animal.
 

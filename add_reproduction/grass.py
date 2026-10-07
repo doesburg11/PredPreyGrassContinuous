@@ -63,6 +63,7 @@ class GrassLayer:
         overgrazing=False,
         overgrazing_threshold=0.0,
         overgrazing_delay=400,
+        predators_observe=False,
     ):
         for name, value, minimum in (
             ("count", count, 0),
@@ -76,6 +77,7 @@ class GrassLayer:
             ("clustered", clustered),
             ("random_respawn", random_respawn),
             ("dispersal", dispersal),
+            ("predators_observe", predators_observe),
             ("overgrazing", overgrazing),
         ):
             if type(value) is not bool:
@@ -123,6 +125,7 @@ class GrassLayer:
         self.overgrazing = overgrazing
         self.overgrazing_threshold = overgrazing_threshold
         self.overgrazing_delay = overgrazing_delay
+        self.predators_observe = predators_observe
         self.rng = random.Random()
         self.centres = []
         self.collapsed = []
@@ -282,28 +285,32 @@ class GrassLayer:
             patch.ready_at = regrows
             patch.regrow = "centre"
 
-    def observation(self, prey):
-        """[seen, wrapped dx/range, wrapped dy/range, distance/range]."""
+    def observation(self, animal, view_distance=None, fov=None):
+        """The nearest available patch in the animal's view cone, as [seen,
+        wrapped dx/range, wrapped dy/range, distance/range]. The view cone
+        defaults to the prey's."""
+        view_distance = view_distance or self.env.prey_view_distance
+        fov = fov or self.env.prey_fov
         visible = []
         torus = self.env.torus
         for patch in self.patches:
             if not self.available(patch):
                 continue
             if not torus.check_if_entity_is_in_view_in_torus(
-                prey, patch, self.env.prey_view_distance, self.env.prey_fov
+                animal, patch, view_distance, fov
             ):
                 continue
             dx = (
-                patch.position.x - prey.position.x + torus.width / 2
+                patch.position.x - animal.position.x + torus.width / 2
             ) % torus.width - torus.width / 2
             dy = (
-                patch.position.y - prey.position.y + torus.height / 2
+                patch.position.y - animal.position.y + torus.height / 2
             ) % torus.height - torus.height / 2
             visible.append((math.hypot(dx, dy), dx, dy))
         if not visible:
             return np.zeros(4, dtype=np.float32)
         distance, dx, dy = min(visible)
-        scale = self.env.prey_view_distance
+        scale = view_distance
         return np.asarray(
             [1.0, dx / scale, dy / scale, distance / scale], dtype=np.float32
         )
@@ -510,8 +517,10 @@ def draw_population(pygame, surface, history, max_steps):
 def patch_grass(raw_env, **settings):
     """Attach food to one Aquarium instance before RLlib snapshots its spaces.
 
-    Only prey receive four additional inputs. Predator observations retain
-    their original shape, allowing later experiments with a frozen hunter.
+    Prey receive four additional inputs: the nearest available patch in
+    their view cone. With predators_observe, predators receive the same four
+    inputs for their own view cone; otherwise their observations keep their
+    original shape.
     """
     layer = GrassLayer(raw_env, **settings)
     raw_env.grass = layer
@@ -524,6 +533,15 @@ def patch_grass(raw_env, **settings):
         -1.0, 1.0, shape=(raw_env.number_of_fish_observations + 4,), dtype=np.float32
     )
     raw_env.number_of_fish_observations += 4
+    predator_space = original_space("predator_0")
+    if layer.predators_observe:
+        predator_space = Box(
+            -1.0,
+            1.0,
+            shape=(raw_env.number_of_predator_observations + 4,),
+            dtype=np.float32,
+        )
+        raw_env.number_of_predator_observations += 4
 
     def get_obs():
         obs = original_obs()
@@ -531,6 +549,16 @@ def patch_grass(raw_env, **settings):
             agent = prey.id()
             if agent in obs:
                 obs[agent] = np.concatenate((obs[agent], layer.observation(prey)))
+        if layer.predators_observe:
+            for predator in raw_env.predators:
+                agent = predator.id()
+                if agent in obs:
+                    grass = layer.observation(
+                        predator,
+                        raw_env.predator_view_distance,
+                        raw_env.predator_fov,
+                    )
+                    obs[agent] = np.concatenate((obs[agent], grass))
         return obs
 
     def reset(seed=None, options=None):
@@ -602,6 +630,6 @@ def patch_grass(raw_env, **settings):
     raw_env.step = step
     raw_env.get_obs = get_obs
     raw_env.observation_space = lambda agent: (
-        prey_space if agent.startswith("prey_") else original_space(agent)
+        prey_space if agent.startswith("prey_") else predator_space
     )
     raw_env.render = render

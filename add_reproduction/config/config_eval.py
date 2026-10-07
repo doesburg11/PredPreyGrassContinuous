@@ -12,7 +12,10 @@ config_eval = {
     # A run's checkpoint/ directory (its final model) or one of its
     # checkpoint/iter_<n> directories. Only for "checkpoint".
     "checkpoint": str(
-        RUNS_DIR / "add_reproduction_2026-10-05_18-18-53_020370" / "checkpoint"
+        RUNS_DIR
+        / "add_reproduction_2026-10-07_09-38-10_103867"
+        / "checkpoint"
+        / "iter_000070"
     ),
     "model_seed": 0,  # Which recommended model (0, 1 or 2). Only for "recommended".
     "episodes": 1,
@@ -32,7 +35,7 @@ config_eval = {
     # Environment settings that replace the checkpoint's (or config_env's)
     # values, e.g. {"grass_clustered": True} to test a policy trained on
     # scattered grass in clustered grass. Keys as in config_env.py.
-    "env_overrides": {"grass_clustered": True, "grass_cluster_count": 5},
+    "env_overrides": {},
     # Display: "window" (live pygame window), "video" (also saves an mp4 per
     # episode in out_dir), or "none" (no rendering, fastest).
     "render": "window",

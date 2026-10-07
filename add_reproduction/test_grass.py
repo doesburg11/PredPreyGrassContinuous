@@ -474,3 +474,42 @@ def test_dispersal_and_overgrazing_run_in_the_environment():
             assert 0 <= patch.position.x < 800 and 0 <= patch.position.y < 800
     finally:
         env.close()
+
+
+def test_predators_observe_grass_in_their_own_view_cone():
+    config = {
+        "obs_mode": "egocentric",
+        "predator_count": 1,
+        "prey_count": 1,
+        "grass_count": 1,
+        "predator_view_distance": 200,
+        "predator_fov": 150,
+    }
+    env = make_env({**config, "grass_predators_observe": True})
+    try:
+        env.reset(seed=0)
+        raw = env.par_env.aec_env.unwrapped
+        assert env.get_observation_space("predator_0").shape == (32,)
+        predator = raw.predators[0]
+        predator.position = Vector(400, 400)
+        predator.orientation_angle = 0  # facing +x
+        raw.prey[0].position = Vector(100, 100)
+        raw.grass.patches = [GrassPatch(Vector(500, 400))]  # 100 ahead
+        grass = np.asarray(raw.get_obs()["predator_0"][-4:])
+        np.testing.assert_allclose(grass, [1.0, 0.5, 0.0, 0.5])
+        raw.grass.patches = [GrassPatch(Vector(300, 400))]  # behind: unseen
+        np.testing.assert_array_equal(raw.get_obs()["predator_0"][-4:], np.zeros(4))
+    finally:
+        env.close()
+    env = make_env(config)  # off by default: predators keep 28 inputs
+    try:
+        env.reset(seed=0)
+        assert env.get_observation_space("predator_0").shape == (28,)
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize("settings", [{"predators_observe": "yes"}])
+def test_invalid_predators_observe_setting(raw, settings):
+    with pytest.raises(ValueError):
+        GrassLayer(raw, **settings)

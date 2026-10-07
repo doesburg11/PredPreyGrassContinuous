@@ -709,6 +709,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "grass_overgrazing",
         "grass_overgrazing_threshold",
         "grass_overgrazing_delay",
+        "grass_predators_observe",
     )
     grass_config = None
     if any(key in env_config for key in grass_keys):
