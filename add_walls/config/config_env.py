@@ -85,7 +85,7 @@ config_env = {
     # can hide, as in PredPreyGrass's walls_occlusion. None switches them off;
     # "blocks" is a forest of 16 square blocks, "chambers" four rooms with
     # doorways, "custom" uses walls_rectangles [(x, y, width, height), ...].
-    "walls_layout": None,
+    "walls_layout": "blocks",
     "walls_thickness": 32.0,  # Arena units; at least 16 (one cell is ~32).
     "walls_rectangles": [],
     "walls_occlusion": True,  # Walls block sight (animals and grass).

@@ -43,7 +43,8 @@ config_eval = {
     # Write episode, step, predators, prey and cumulative births per decision
     # to this CSV; None writes nothing.
     "population_csv": None,
-    "draw_view_cones": False,
+    # One predator and one prey; selection switches when an animal dies.
+    "draw_view_cones": True,
     "draw_force_vectors": False,
     "draw_hit_boxes": False,
     "draw_death_circles": False,

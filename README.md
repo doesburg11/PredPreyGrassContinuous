@@ -60,7 +60,10 @@ slide along walls instead of passing through them. Anything behind a wall is
 hidden from view, so prey can hide and predators can ambush. Every agent
 senses nearby walls through a few distance inputs. Layouts include a "forest"
 of square blocks, four rooms connected by doorways, and custom rectangles.
-Walls are switched on with `walls_layout`. See the
+Occlusion uses a precomputed cell-to-cell line-of-sight table, so it costs a
+table lookup per check during an episode. The viewer clips the view cones of
+one predator and one prey at the walls, so you can watch what each animal can
+and cannot see. Walls are set with `walls_layout` (default `"blocks"`). See the
 [add_walls README](add_walls/README.md#walls) for how they work.
 
 All subprojects share one Conda environment at the repo root (`.conda/`).

@@ -96,3 +96,39 @@ def test_env_overrides_replace_environment_settings(monkeypatch):
     evaluation.main()
     assert built[0]["grass_clustered"] is True
     assert built[0]["grass_cluster_count"] == 3
+
+
+def test_view_cones_follow_one_survivor_per_species():
+    from types import SimpleNamespace
+
+    predators = [SimpleNamespace(alive=True) for _ in range(2)]
+    prey = [SimpleNamespace(alive=True) for _ in range(2)]
+    drawn = []
+    raw = SimpleNamespace(
+        predators=predators,
+        prey=prey,
+        draw_view_cone_in_torus=lambda animal, distance, fov: drawn.append(animal),
+    )
+    evaluation.limit_view_cones(raw)
+
+    def frame():
+        drawn.clear()
+        for animal in raw.prey + raw.predators:
+            raw.draw_view_cone_in_torus(animal, 200, 150)
+        return [id(animal) for animal in drawn]
+
+    assert frame() == [id(prey[0]), id(predators[0])]
+    # Reordering or births must not switch a still-living selected animal.
+    raw.predators = list(reversed(predators))
+    assert frame() == [id(prey[0]), id(predators[0])]
+    predators[0].alive = False
+    prey[0].alive = False
+    raw.prey = [prey[1]]
+    raw.predators = [predators[1]]
+    assert frame() == [id(prey[1]), id(predators[1])]
+    raw.predators = []
+    assert frame() == [id(prey[1])]
+    # Reset can reuse IDs; selection follows the new objects.
+    new_prey = SimpleNamespace(alive=True)
+    raw.prey = [new_prey]
+    assert frame() == [id(new_prey)]

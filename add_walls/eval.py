@@ -59,6 +59,25 @@ def select_random_actions(env, obs: dict) -> dict:
     return {agent_id: env.action_space[agent_id].sample() for agent_id in obs}
 
 
+def limit_view_cones(raw_env):
+    """Draw one persistent survivor per species; replace it after death/reset."""
+    original_draw = raw_env.draw_view_cone_in_torus
+    selected = {"predator": None, "prey": None}
+
+    def draw(animal, view_distance, fov):
+        for species, population in (
+            ("predator", raw_env.predators),
+            ("prey", raw_env.prey),
+        ):
+            living = [entity for entity in population if entity.alive]
+            if not any(entity is selected[species] for entity in living):
+                selected[species] = living[0] if living else None
+        if any(animal is entity for entity in selected.values()):
+            original_draw(animal, view_distance, fov)
+
+    raw_env.draw_view_cone_in_torus = draw
+
+
 SOURCES = ("checkpoint", "random", "recommended")
 RENDERS = ("window", "video", "none")
 
@@ -176,6 +195,8 @@ def main():
     env = make_env(env_config)
 
     raw_env = env.par_env.aec_env.unwrapped
+    if args.draw_view_cones:
+        limit_view_cones(raw_env)
     csv_file = None
     if args.population_csv:
         # Closed in the finally block below.

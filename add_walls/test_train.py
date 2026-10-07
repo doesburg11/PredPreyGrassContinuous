@@ -256,7 +256,8 @@ def test_make_env_fills_in_required_obs_mode_and_permanent_deaths():
         raw = env.par_env.aec_env.unwrapped
         assert raw.keep_prey_count_constant is False
         assert raw._egocentric_obs_patched
-        assert env.get_observation_space("prey_0").shape == (33,)
+        wall_inputs = env_config["walls_rays"] if env_config["walls_layout"] else 0
+        assert env.get_observation_space("prey_0").shape == (33 + wall_inputs,)
     finally:
         env.close()
 

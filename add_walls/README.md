@@ -3,9 +3,9 @@
 A contained copy of `add_reproduction` that adds **walls**: obstacles that
 block movement and sight, so prey can hide from predators and predators can
 ambush prey, as in PredPreyGrass's `walls_occlusion` experiments (see
-[Walls](#walls) below). Walls are switched on with `walls_layout` in
-`config/config_env.py`; with `walls_layout = None` the module behaves like
-`add_reproduction`.
+[Walls](#walls) below). Walls are set with `walls_layout` in
+`config/config_env.py` (default `"blocks"`); with `walls_layout = None` the
+module behaves like `add_reproduction`.
 
 This module also computes observations once per decision instead of after
 every physics step to reduce environment-stepping overhead. Physics, food,
@@ -33,9 +33,10 @@ reference sections.
 | Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
 | Direction and target speed | New configurations enable 16 directions at full, half or stopped speed; acceleration and braking remain controlled by physics |
 | Movement energy costs | Actual speed squared and change in velocity squared add to resting decay each physics step; speed is measured after wall resolution |
+| Occluded view cones | The viewer clips each view cone at the walls, so the drawn cone shows what an animal can see; one predator and one prey are followed, switching when it dies |
 | Regression coverage | Tests cover wall geometry, wrapping, visibility, open-space placement, target speeds, braking, movement costs, newborn action spaces and PPO's expanded action outputs |
 
-Walls are disabled by default (`walls_layout = None`). Target-speed controls
+Walls default to the `"blocks"` layout (`walls_layout = None` switches them off). Target-speed controls
 and movement costs are enabled in the current configuration; they were also
 added to `add_reproduction`. Older checkpoint configurations keep their original
 16-action controls and fixed metabolic decay.
@@ -328,8 +329,9 @@ otherwise always runs with the grass settings it was trained with.
 
 Walls are obstacles that block movement and sight, so prey can hide from
 predators and predators can ambush prey. They are the continuous counterpart
-of PredPreyGrass's `walls_occlusion` experiments. Walls are off by default
-(`walls_layout = None`). Set a layout in `config/config_env.py` to use them:
+of PredPreyGrass's `walls_occlusion` experiments. The default layout is
+`"blocks"`; set `walls_layout = None` in `config/config_env.py` to switch
+walls off, or choose another layout:
 
 - `"blocks"`: a "forest" of 4 x 4 square blocks, each two wall thicknesses
   wide (64 units), evenly spread over the arena.
@@ -377,14 +379,20 @@ Walls do three things:
    means no wall within view. Without these inputs, agents would only notice
    walls by bumping into them.
 
-The viewer draws walls in grey-brown. Walls add roughly 15% to the time per
+The viewer draws walls in grey-brown. With `draw_view_cones` (on in
+`config_eval.py`), it draws the view cone of one predator (blue) and one prey
+(red), clipped at the exact wall outlines, so the shaded area is what that
+animal can see. The selected animal is kept until it dies; then the next
+living animal of its species is followed. The drawing is exact; the agents'
+own visibility uses the cell table above, so the two can differ by up to a
+cell near walls. Walls add roughly 15% to the time per
 environment step in a typical episode (pushing animals out, the ray inputs
 and the visibility lookups). Because walls add inputs, runs with walls must
 be trained from scratch.
 
 | Setting | Default | Meaning |
 |---|---:|---|
-| `walls_layout` | None | `None` (no walls), `"blocks"`, `"chambers"` or `"custom"` |
+| `walls_layout` | `"blocks"` | `None` (no walls), `"blocks"`, `"chambers"` or `"custom"` |
 | `walls_thickness` | 32 | Wall thickness for the preset layouts (at least 16) |
 | `walls_rectangles` | [] | Rectangles for `"custom"`: `(x, y, width, height)` |
 | `walls_occlusion` | True | Walls block sight of animals and grass |
@@ -414,6 +422,13 @@ population CSV. Edit it, then run without command-line arguments:
 
 ```bash
 .conda/bin/python add_walls/eval.py
+```
+
+To watch random agents in the current wall layout in a live window,
+whatever `source` and `render` are set to:
+
+```bash
+.conda/bin/python add_walls/random_eval.py
 ```
 
 With `source = "random"`, the population counts and episode length come from

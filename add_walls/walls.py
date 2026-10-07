@@ -19,6 +19,7 @@ The arena wraps around, and so do walls: a wall at an edge also blocks
 animals and lines of sight that cross that edge.
 """
 
+import itertools
 import math
 
 import numpy as np
@@ -147,17 +148,27 @@ class Walls:
         covered. Weight open rectangles by area to sample uniformly.
         """
         left, top, right, bottom = bounds or (0, 0, self.width, self.height)
-        xs = sorted({left, right} | {
-            float(edge) for x, _, w, _ in self.images
-            for edge in (x, x + w) if left < edge < right
-        })
-        ys = sorted({top, bottom} | {
-            float(edge) for _, y, _, h in self.images
-            for edge in (y, y + h) if top < edge < bottom
-        })
+        xs = sorted(
+            {left, right}
+            | {
+                float(edge)
+                for x, _, w, _ in self.images
+                for edge in (x, x + w)
+                if left < edge < right
+            }
+        )
+        ys = sorted(
+            {top, bottom}
+            | {
+                float(edge)
+                for _, y, _, h in self.images
+                for edge in (y, y + h)
+                if top < edge < bottom
+            }
+        )
         regions, areas = [], []
-        for x1, x2 in zip(xs, xs[1:]):
-            for y1, y2 in zip(ys, ys[1:]):
+        for x1, x2 in itertools.pairwise(xs):
+            for y1, y2 in itertools.pairwise(ys):
                 if not self.inside((x1 + x2) / 2, (y1 + y2) / 2):
                     regions.append((x1, y1, x2, y2))
                     areas.append((x2 - x1) * (y2 - y1))
@@ -282,6 +293,32 @@ class Walls:
         )
         return np.minimum(hits, 1.0).astype(np.float32)
 
+    def cone_points(self, animal, view_distance, fov):
+        """A visual cone clipped to exact wall geometry, including corners.
+
+        Policy visibility still uses the coarser precomputed cell table.
+        """
+        origin = np.array([animal.position.x, animal.position.y])
+        start = math.radians(-animal.orientation_angle - fov / 2)
+        span = math.radians(fov)
+        angles = list(np.linspace(0, span, max(2, math.ceil(fov) + 1)))
+        for x, y, w, h in self.images:
+            for cx, cy in ((x, y), (x + w, y), (x, y + h), (x + w, y + h)):
+                angle = (math.atan2(cy - origin[1], cx - origin[0]) - start) % (
+                    2 * math.pi
+                )
+                angles.extend(
+                    a for a in (angle - 1e-7, angle, angle + 1e-7) if 0 <= a <= span
+                )
+        angles = np.array(sorted(angles)) + start
+        dx, dy = np.cos(angles) * view_distance, np.sin(angles) * view_distance
+        hit = self._segment_hits(
+            np.full(len(angles), origin[0]), np.full(len(angles), origin[1]), dx, dy
+        )
+        fraction = np.minimum(hit, 1)
+        arc = origin + np.column_stack((dx, dy)) * fraction[:, None]
+        return np.vstack((origin, arc, origin))
+
     def overlapping(self, animals):
         """Indices of the animals that touch any wall (one NumPy pass)."""
         if not animals:
@@ -380,6 +417,7 @@ def patch_walls(raw_env, **settings):
     original_obs = raw_env.get_obs
     original_space = raw_env.observation_space
     original_render = raw_env.render
+    original_cone = raw_env.draw_view_cone_in_torus
     torus = raw_env.torus
     original_in_view = torus.check_if_entity_is_in_view_in_torus
 
@@ -432,6 +470,22 @@ def patch_walls(raw_env, **settings):
 
     hooked_view = None
 
+    def draw_cone(animal, view_distance, fov):
+        if not walls.occlusion:
+            return original_cone(animal, view_distance, fov)
+        if raw_env.view is None:
+            return
+        import pygame
+
+        color = (82, 117, 172) if animal.id().startswith("predator") else (167, 98, 88)
+        screen = raw_env.view.screen
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        points = walls.cone_points(animal, view_distance, fov)
+        for dx in (-walls.width, 0, walls.width):
+            for dy in (-walls.height, 0, walls.height):
+                pygame.draw.polygon(overlay, (*color, 80), points + [dx, dy])
+        screen.blit(overlay, (0, 0))
+
     def render(mode=None):
         nonlocal hooked_view
         from grass import ensure_view
@@ -463,3 +517,4 @@ def patch_walls(raw_env, **settings):
         spaces["predator"] if agent.startswith("predator") else spaces["prey"]
     )
     raw_env.render = render
+    raw_env.draw_view_cone_in_torus = draw_cone

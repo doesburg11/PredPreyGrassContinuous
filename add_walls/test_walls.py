@@ -1,7 +1,7 @@
 """Walls: layouts, blocked movement, occlusion, wall sensing, integration."""
 
-from types import SimpleNamespace
 import random
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -252,19 +252,25 @@ def test_custom_rectangles_reject_sizes_larger_than_arena(size):
 @pytest.mark.parametrize("offset", [-1600, 1600])
 def test_custom_rectangles_wrap_consistently(offset):
     reference = Walls(arena(), layout="custom", rectangles=ONE_WALL)
-    wrapped = Walls(arena(), layout="custom", rectangles=[(380 + offset, 100 + offset, 40, 600)])
+    wrapped = Walls(
+        arena(), layout="custom", rectangles=[(380 + offset, 100 + offset, 40, 600)]
+    )
     np.testing.assert_array_equal(wrapped.rects, reference.rects)
     np.testing.assert_array_equal(wrapped.visible, reference.visible)
     body = animal(370, 300, vx=5)
     assert wrapped.inside(390, 300)
     assert wrapped.overlapping([body]) == [0]
-    np.testing.assert_array_equal(wrapped.ray_distances(body, 200), reference.ray_distances(body, 200))
+    np.testing.assert_array_equal(
+        wrapped.ray_distances(body, 200), reference.ray_distances(body, 200)
+    )
     wrapped.push_out(body)
     assert body.position.x == pytest.approx(364)
 
 
 def test_edge_crossing_custom_rectangle_wraps():
-    walls = Walls(arena(), layout="custom", rectangles=[(790, 300, 40, 200)], occlusion=False)
+    walls = Walls(
+        arena(), layout="custom", rectangles=[(790, 300, 40, 200)], occlusion=False
+    )
     assert walls.inside(5, 400)
     body = animal(35, 400, vx=-5)
     assert walls.overlapping([body]) == [0]
@@ -273,10 +279,13 @@ def test_edge_crossing_custom_rectangle_wraps():
     assert body.position.x == pytest.approx(46)
 
 
-@pytest.mark.parametrize("rect,bounds", [
-    ((100, 100, 40, 100), (100, 100, 180, 200)),
-    ((790, 300, 40, 200), (0, 300, 80, 500)),
-])
+@pytest.mark.parametrize(
+    "rect,bounds",
+    [
+        ((100, 100, 40, 100), (100, 100, 180, 200)),
+        ((790, 300, 40, 200), (0, 300, 80, 500)),
+    ],
+)
 def test_sample_open_in_partially_blocked_bounded_region(rect, bounds):
     walls = Walls(arena(), layout="custom", rectangles=[rect], occlusion=False)
     rng = random.Random(0)
@@ -291,3 +300,35 @@ def test_sample_open_rejects_fully_blocked_bounded_region():
     walls = Walls(arena(), layout="custom", rectangles=ONE_WALL, occlusion=False)
     with pytest.raises(ValueError, match="no usable space"):
         walls.sample_open(random.Random(0), (385, 200, 415, 300))
+
+
+def test_rendered_cone_is_clipped_by_wall_and_wraps():
+    import pygame
+
+    env = make_env(
+        {
+            "obs_mode": "egocentric",
+            "walls_layout": "custom",
+            "walls_rectangles": [(380, 100, 40, 600)],
+        }
+    )
+    try:
+        env.reset(seed=0)
+        raw = env.par_env.aec_env.unwrapped
+        body = raw.predators[0]
+        body.position = Vector(280, 400)
+        body.orientation_angle = 0
+        raw.view = SimpleNamespace(screen=pygame.Surface((800, 800)))
+        raw.view.screen.fill((0, 0, 0))
+        raw.draw_view_cone_in_torus(body, 267, 150)
+        assert sum(raw.view.screen.get_at((330, 400))[:3]) > 0
+        assert sum(raw.view.screen.get_at((450, 400))[:3]) == 0
+        # A cone pointing left across the seam still appears on the right.
+        raw.view.screen.fill((0, 0, 0))
+        body.position = Vector(20, 50)
+        body.orientation_angle = 180
+        raw.draw_view_cone_in_torus(body, 100, 90)
+        assert sum(raw.view.screen.get_at((780, 50))[:3]) > 0
+    finally:
+        raw.view = None
+        env.close()
