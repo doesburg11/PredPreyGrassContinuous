@@ -25,7 +25,8 @@ trained with RLlib's new API stack (RLModule + Learner).
   and what they showed.
 - [`add_walls/`](add_walls/) — `add_reproduction` plus walls that block
   movement and sight, so animals can hide, and observations computed once per
-  decision (about 3.5 times faster). See its [README](add_walls/README.md).
+  decision to reduce environment-stepping overhead. See its
+  [README](add_walls/README.md).
 
 ## Grass: from static patches to moving clusters
 

@@ -8,11 +8,41 @@ ambush prey, as in PredPreyGrass's `walls_occlusion` experiments (see
 `add_reproduction`.
 
 This module also computes observations once per decision instead of after
-every physics step, which makes the environment about 3.5 times faster with
-identical results (see `SafeParallelPettingZooEnv.step` in `env_wrapper.py`).
+every physics step to reduce environment-stepping overhead. Physics, food,
+energy, deaths and births still update every step; the policy reads the
+observation at the end of the decision. The speedup depends on the configuration
+(see `SafeParallelPettingZooEnv.step` in `env_wrapper.py`).
 
 Everything else (reproduction, energy, moving grass, rewards, populations)
 works as in `add_reproduction`, as described below.
+
+## Additions made in add_walls
+
+This module started as a contained copy of `add_reproduction`. Its additions
+are listed below in order; inherited features are described in the later
+reference sections.
+
+| Addition | Behavior |
+|---|---|
+| Wall layouts | Built-in `blocks` and `chambers`, plus custom `(x, y, width, height)` rectangles; walls wrap across arena edges |
+| Wall collisions | Animals are pushed out of obstacles and lose velocity into a wall while retaining movement along it; newborns are also moved clear of walls |
+| Sight occlusion | Walls hide animals and grass using a precomputed visibility table |
+| Wall sensing | `walls_rays` distance inputs are appended to each agent's observations; eight rays increase the default observation size from 33 to 41 |
+| Observation computation | Observations are computed once per repeated decision, including the updated state after wall collision resolution |
+| Wall geometry validation | Nonfinite coordinates and sizes, undersized walls, and rectangles larger than the arena are rejected; origins are normalized so collisions, sight, sensing and rendering use the same geometry |
+| Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
+| Direction and target speed | New configurations enable 16 directions at full, half or stopped speed; acceleration and braking remain controlled by physics |
+| Movement energy costs | Actual speed squared and change in velocity squared add to resting decay each physics step; speed is measured after wall resolution |
+| Regression coverage | Tests cover wall geometry, wrapping, visibility, open-space placement, target speeds, braking, movement costs, newborn action spaces and PPO's expanded action outputs |
+
+Walls are disabled by default (`walls_layout = None`). Target-speed controls
+and movement costs are enabled in the current configuration; they were also
+added to `add_reproduction`. Older checkpoint configurations keep their original
+16-action controls and fixed metabolic decay.
+
+Aquarium's `observable_walls` parameter does not construct these obstacles:
+its border-observation calls are commented out in the installed package. Our
+walls are controlled by the `walls_*` settings.
 
 Edit `config/config_env.py` and `config/config_ppo.py`, then run from the
 repository root:
@@ -156,11 +186,14 @@ These use PredPreyGrass's energy units, with its per-step rates divided by 8,
 because crossing this arena takes about 8 times as many steps as crossing
 its grid. PredPreyGrass has no energy cap. Here the caps are set at twice the
 reproduction thresholds, so they rarely bind and mainly scale each agent's
-own-energy input (energy / max). Without food, a predator starves after 267
-steps and a prey after 480 steps.
+own-energy input (energy / max). With resting decay alone and no food, a
+predator starves after 267 steps and a prey after 480 steps. Movement costs
+shorten those lifetimes when enabled.
 
 Each step, catching predators gain catch_efficiency_predator times the prey's energy,
-prey gain energy per grass patch eaten, and every animal loses its decay.
+prey gain energy per grass patch eaten, and every animal loses its resting
+decay plus the configured speed and acceleration costs (see
+[Direction and target speed](#direction-and-target-speed)).
 Animals at or below zero energy starve: they are removed and terminated, with
 `infos[agent]["starved"] = True`. Reproduction follows. The episode ends once
 no predators or no prey are left. If the prey are gone, every agent is
