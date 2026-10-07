@@ -24,6 +24,12 @@ Usage (from add_reproduction/):
     python tournament.py runs/<run> --every 100 --episodes 20
     python tournament.py runs/<run> --iterations 50,200,380
     python tournament.py runs/<run> --prey-iteration 290  # fixed prey
+    python tournament.py runs/<run1> runs/<run2> --every 300  # continued runs
+
+Several run directories are treated as one continuous training, for runs
+started from the previous run's final checkpoint (init_checkpoint): their
+checkpoints get global iteration numbers that continue where the previous
+run ended, and all runs must share the same environment settings.
 
 --prey-iteration plays every predator checkpoint against one prey checkpoint,
 e.g. for a run trained against frozen prey (where all prey checkpoints are
@@ -77,6 +83,24 @@ def checkpoint_iterations(run_dir):
     return sorted(found)
 
 
+def combined_checkpoints(run_dirs):
+    """{global iteration: (run directory, its own iteration)} for runs that
+    continue one another. A run's length is its last checkpoint plus the
+    checkpoint spacing (990 + 10 = 1000), so the next run's iteration 10 is
+    global iteration 1010."""
+    combined = {}
+    offset = 0
+    for run_dir in run_dirs:
+        iterations = checkpoint_iterations(run_dir)
+        if not iterations:
+            raise ValueError(f"{run_dir} has no checkpoints")
+        for iteration in iterations:
+            combined[offset + iteration] = (str(run_dir), iteration)
+        spacing = iterations[-1] - iterations[-2] if len(iterations) > 1 else 0
+        offset += iterations[-1] + spacing
+    return combined
+
+
 def select_iterations(available, every=None, iterations=None):
     """The requested iterations (all must exist), or every `every`-th one,
     always including the newest checkpoint."""
@@ -123,11 +147,11 @@ def run_env_config(run_dir, iteration):
 _worker = {}
 
 
-def _init_worker(run_dir, env_config):
+def _init_worker(locations, env_config):
     import torch
 
     torch.set_num_threads(1)
-    _worker.update(run_dir=run_dir, env_config=env_config, modules={}, env=None)
+    _worker.update(locations=locations, env_config=env_config, modules={}, env=None)
 
 
 def _module(species, iteration):
@@ -135,7 +159,8 @@ def _module(species, iteration):
 
     key = (species, iteration)
     if key not in _worker["modules"]:
-        path = module_dir(_worker["run_dir"], iteration, species)
+        run_dir, own_iteration = _worker["locations"][iteration]
+        path = module_dir(run_dir, own_iteration, species)
         module: Any = RLModule.from_checkpoint(str(path.resolve()))
         module.to("cpu")
         module.eval()
@@ -151,8 +176,10 @@ def _env():
     return _worker["env"]
 
 
-def sample_actions(modules, obs, generator):
-    """Sample every agent's action, one batched forward pass per species."""
+def sample_actions(modules, obs, generator, raw_env=None):
+    """Sample every agent's action, one batched forward pass per species. A
+    species' entry can also be a scripted policy with an act(raw_env, agents)
+    method returning {agent: action} (see scripted_predators.py)."""
     import torch
     from ray.rllib.core.columns import Columns
 
@@ -160,6 +187,9 @@ def sample_actions(modules, obs, generator):
     for species in SPECIES:
         agents = [agent for agent in obs if agent.startswith(species)]
         if not agents:
+            continue
+        if hasattr(modules[species], "act"):
+            actions.update(modules[species].act(raw_env, agents))
             continue
         batch = torch.from_numpy(
             np.stack([np.asarray(obs[agent], dtype=np.float32) for agent in agents])
@@ -198,7 +228,9 @@ def play_episode(env, modules, seed):
     decisions = 0
     while True:
         before = (raw.time_step, len(raw.predators), len(raw.prey))
-        obs, _, terms, truncs, infos = env.step(sample_actions(modules, obs, generator))
+        obs, _, terms, truncs, infos = env.step(
+            sample_actions(modules, obs, generator, raw)
+        )
         decisions += 1
         steps = raw.time_step - before[0]
         # Mean of the counts before and after: animals born or killed during
@@ -377,7 +409,12 @@ def format_predator_table(rows, iterations):
 
 def main():
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    parser.add_argument("run", help="Training run directory (contains checkpoint/)")
+    parser.add_argument(
+        "runs",
+        nargs="+",
+        help="Training run directory (contains checkpoint/); several directories "
+        "for runs that continue one another, oldest first",
+    )
     parser.add_argument("--every", type=int, default=50, help="Checkpoint spacing")
     parser.add_argument(
         "--iterations",
@@ -396,34 +433,44 @@ def main():
         "--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2)
     )
     parser.add_argument(
-        "--out", default=None, help="CSV (default: <run>/tournament.csv)"
+        "--out",
+        default=None,
+        help="CSV (default: tournament.csv in the (last) run directory)",
     )
     args = parser.parse_args()
     if args.episodes < 1 or args.workers < 1 or args.every < 1:
         raise SystemExit("--episodes, --workers and --every must be positive")
 
-    run_dir = Path(args.run).resolve()
+    run_dirs = [Path(run).resolve() for run in args.runs]
+    locations = combined_checkpoints(run_dirs)
+    available = sorted(locations)
     requested = (
         [int(i) for i in args.iterations.split(",")] if args.iterations else None
     )
-    iterations = select_iterations(
-        checkpoint_iterations(run_dir), every=args.every, iterations=requested
-    )
-    env_config = run_env_config(run_dir, iterations[-1])
+    iterations = select_iterations(available, every=args.every, iterations=requested)
+    env_config = run_env_config(*locations[iterations[-1]])
+    for run_dir in run_dirs[:-1]:
+        other = run_env_config(run_dir, checkpoint_iterations(run_dir)[-1])
+        differing = sorted(
+            key
+            for key in set(other) | set(env_config)
+            if other.get(key) != env_config.get(key)
+        )
+        if differing:
+            raise SystemExit(f"{run_dir.name} has other env settings: {differing}")
     prey_iterations = iterations
     if args.prey_iteration is not None:
-        prey_iterations = select_iterations(
-            checkpoint_iterations(run_dir), iterations=[args.prey_iteration]
-        )
+        prey_iterations = select_iterations(available, iterations=[args.prey_iteration])
     tasks = [
         (predator_iter, prey_iter, episode, args.seed + episode)
         for predator_iter in iterations
         for prey_iter in prey_iterations
         for episode in range(args.episodes)
     ]
-    out = Path(args.out) if args.out else run_dir / "tournament.csv"
+    out = Path(args.out) if args.out else run_dirs[-1] / "tournament.csv"
     print(
-        f"{len(iterations)} checkpoints {iterations}: {len(iterations) ** 2} "
+        f"{len(iterations)} checkpoints {iterations}: "
+        f"{len(iterations) * len(prey_iterations)} "
         f"matchups x {args.episodes} episodes = {len(tasks)} episodes "
         f"on {args.workers} workers",
         flush=True,
@@ -436,7 +483,7 @@ def main():
             max_workers=args.workers,
             mp_context=get_context("spawn"),
             initializer=_init_worker,
-            initargs=(str(run_dir), env_config),
+            initargs=(locations, env_config),
         ) as pool,
         open(out, "w", encoding="utf-8") as csv,
     ):

@@ -147,3 +147,20 @@ def test_predator_table_pools_episodes_per_predator_checkpoint():
     assert second["catch_risk"] == pytest.approx(4.0)
     assert second["catches_per_predator"] == pytest.approx(2.0)
     assert "catch risk" in tournament.format_predator_table(rows, [10, 20])
+
+
+def test_combined_checkpoints_continue_iteration_numbers(tmp_path):
+    for run, iterations in (("first", (10, 20, 30)), ("second", (10, 20))):
+        for iteration in iterations:
+            (tmp_path / run / "checkpoint" / f"iter_{iteration:06d}").mkdir(
+                parents=True
+            )
+    combined = tournament.combined_checkpoints(
+        [tmp_path / "first", tmp_path / "second"]
+    )
+    # The first run ends at 30 + 10 = 40, so the second continues from there.
+    assert sorted(combined) == [10, 20, 30, 50, 60]
+    assert combined[50] == (str(tmp_path / "second"), 10)
+    assert combined[20] == (str(tmp_path / "first"), 20)
+    with pytest.raises(ValueError, match="no checkpoints"):
+        tournament.combined_checkpoints([tmp_path / "missing"])
