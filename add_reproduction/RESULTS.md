@@ -42,7 +42,7 @@ number comes from an evaluation whose output was not saved, it is marked
 | J | `2026-10-07_09-38-10_103867` | I final | 1,000 | continuation of I | completed |
 | K | `2026-10-07_15-34-38_396259` | J final | 517 | prey faster than predators (5.5 vs 5) | stopped |
 | L | `2026-10-07_18-42-19_138184` | scratch | 1,000 | moving grass, predators see grass | completed |
-| M | `2026-10-07_21-26-01_880217` | L final | 3,000 (planned) | continuation of L | running |
+| M | `2026-10-07_21-26-01_880217` | L final | 3,000 | continuation of L | completed |
 
 Common to all runs: 6 predators and 8 prey at the start, 100 grass patches,
 `max_time_steps = 8000`, `action_repeat = 8`, sparse rewards (+10 per birth,
@@ -326,6 +326,47 @@ vision gave the predators information worth learning from, most likely where
 prey come to eat. The ecosystem became less balanced as a result, as prey
 need many more iterations to adapt.
 
+## 9. Predators see grass, continued (run M)
+
+Run M continued run L for 3,000 iterations (10.3 hours), so 4,000 in total,
+both species training. Per episode, in blocks of 500 iterations:
+
+| Iterations | Run | Predator births | Prey births | Episode length (decisions) |
+|---|---|---:|---:|---:|
+| 1–500 | L | 6.2 | 39 | 109 |
+| 501–1000 | L | 7.0 | 45 | 122 |
+| 1001–1500 | M | 10.0 | 77 | 227 |
+| 1501–2000 | M | 15.6 | 137 | 410 |
+| 2001–2500 | M | 18.5 | 168 | 503 |
+| 2501–3000 | M | 20.9 | 198 | 590 |
+| 3001–3500 | M | 24.7 | 244 | 722 |
+| 3501–4000 | M | 27.2 | 277 | 816 |
+
+**Final check, run M** (`final_check.csv`): **10 of 20 coexisting**, the
+prey died out in the other 10. Averages per episode: length 5,724 physics
+steps, catch risk 2.93, 16.4 prey and 6.3 predators alive, 14.7 prey
+starving. For comparison, run J (blind predators, 3,000 iterations): 8 of 20
+coexisting, catch risk 2.86, 12.9 prey starving.
+
+**Tournament over L and M** (checkpoints every 400 iterations, numbered as
+one training; `tournament_LM.csv` in run M):
+
+- Newer prey are harder to catch for a fixed predator in **96%** of pairs:
+  catch risk falls from about 10–11 (prey at iteration 400) to about 3 (prey
+  at 3,990) in all 10 rows.
+- Newer predators catch more in **43%** of pairs; the trend is flat or
+  slightly negative in 9 of 10 columns. Each predator catches 8.2–8.6 prey
+  per 1,000 steps at every checkpoint.
+- Coexistence depends almost only on the prey checkpoint (0% with prey 400,
+  35% with prey 3,990, averaged over predators), and hardly on the predator
+  checkpoint (7% to 15%).
+
+**Conclusion:** grass vision raised the predators' ceiling once. They
+reached it within the first 400 iterations and then stopped improving, like
+the blind predators. The prey then caught up over the following 3,000
+iterations. A one-time step up in predator ability shifts the balance but
+does not start an arms race.
+
 ## Findings so far
 
 1. **A stable ecosystem needs the prey to be hard to catch early on.** Equal
@@ -342,15 +383,17 @@ need many more iterations to adapt.
    pursuit does about as well as the learned predators; only lead pursuit
    is clearly better (~15%). Freezing the prey (F), adding a catch reward
    (G) and faster prey (K) did not make predators improve, but letting them
-   see grass (L) did: 34% higher catch risk against the same prey.
+   see grass (L) did: 34% higher catch risk against the same prey. They
+   reached the new ceiling within a few hundred iterations and then stopped
+   improving again (M), while the prey caught up.
 5. **Moving grass is a harder, still learnable world for prey:** 0, 4 and 8
    of 20 coexisting after 1,000, 2,000 and 3,000 iterations.
 
 ## Open questions and next steps
 
-- **Continue run L** (as H was continued by I and J): do the prey catch up
-  with predators that see grass, and do both species now keep adapting to
-  each other (tournament)?
+- **Room for predators to keep improving:** a skill that can be refined
+  gradually rather than a one-time gain, such as group hunting (below) or
+  walls with ambush opportunities.
 - **Walls** (`add_walls`): hiding and ambush through blocked movement and
   sight.
 - **Group hunting:** catches that need, or are easier with, several
