@@ -95,7 +95,7 @@ def patch_reproduction(raw_env, **settings):
     """Let animals reproduce once their energy reaches a threshold.
 
     Runs after the energy layer each step (so after movement, catches,
-    feeding, decay and starvation). Each living animal at or above its
+    feeding, metabolic costs and starvation). Each living animal at or above its
     species' threshold has one offspring, while its species is below
     max_<species> and the ID pool has IDs left: the offspring gets the
     species' initial energy, the parent loses that amount and earns the

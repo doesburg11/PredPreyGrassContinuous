@@ -22,8 +22,8 @@ BASE = {
     "energy_prey_initial": 3.0,
     "energy_predator_max": 24.0,
     "energy_prey_max": 16.0,
-    "energy_predator_decay": 1.0,
-    "energy_prey_decay": 0.5,
+    "energy_predator_resting_metabolic_cost": 1.0,
+    "energy_prey_resting_metabolic_cost": 0.5,
     "reproduction_predator_threshold": 12.0,
     "reproduction_prey_threshold": 8.0,
     "reproduction_predator_reward": 10.0,
@@ -94,7 +94,7 @@ def test_birth_creates_offspring_and_charges_and_rewards_parent():
     try:
         obs, raw = setup(env)
         parent = raw.predators[1]
-        parent.energy = 13.0  # 12 after this step's decay of 1
+        parent.energy = 13.0  # 12 after this step's resting cost of 1
         obs, rewards, terms, truncs, infos = env.step(act(obs))
         child = raw.predators[-1]
         assert child.id() == "predator_2"  # next unused ID
@@ -128,7 +128,7 @@ def test_prey_birth_uses_prey_settings():
     env = make()
     try:
         obs, raw = setup(env)
-        raw.prey[0].energy = 9.0  # 8.5 after decay
+        raw.prey[0].energy = 9.0  # 8.5 after the resting cost
         _, rewards, _, _, infos = env.step(act(obs))
         assert infos["prey_2"]["parent"] == "prey_0"
         assert rewards["prey_0"] == pytest.approx(7.0)
@@ -143,8 +143,8 @@ def test_no_birth_below_threshold_and_one_birth_per_parent_per_step():
     env = make(energy_predator_max=24.0)
     try:
         obs, raw = setup(env)
-        raw.predators[0].energy = 12.9  # 11.9 after decay: no birth
-        raw.predators[1].energy = 23.0  # 22 after decay: one birth only
+        raw.predators[0].energy = 12.9  # 11.9 after the resting cost: no birth
+        raw.predators[1].energy = 23.0  # 22 after the resting cost: one birth only
         obs, _, _, _, _ = env.step(act(obs))
         assert len(raw.predators) == 3
         assert raw.predators[1].energy == pytest.approx(17.0)
@@ -312,9 +312,9 @@ def test_rllib_registers_newborns_when_all_known_agents_then_die():
         originals = list(raw.predators + raw.prey)
         # Every original survives the first sub-step and starves on the second.
         for entity in raw.predators:
-            entity.energy = 1.5  # decay 1.0
+            entity.energy = 1.5  # resting cost 1.0
         for entity in raw.prey:
-            entity.energy = 0.8  # decay 0.5
+            entity.energy = 0.8  # resting cost 0.5
         # These two give birth on the first sub-step, keeping 0.5 and 0.2.
         raw.predators[0].energy = 6.5
         raw.prey[0].energy = 3.7

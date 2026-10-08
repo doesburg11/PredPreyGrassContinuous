@@ -709,7 +709,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
       decision, as a crude memory (default 1);
     - `grass_*` settings: stationary renewable food and prey-only
       observation inputs (see grass.py);
-    - `energy_*` settings: decay, food, starvation and an own-energy input
+    - `energy_*` settings: metabolic costs, food, starvation and an own-energy input
       for both species (see energy.py);
     - `reproduction_*` settings: energy-threshold births with a fixed agent
       ID pool (see reproduction.py);
@@ -760,8 +760,8 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "energy_prey_initial",
         "energy_predator_max",
         "energy_prey_max",
-        "energy_predator_decay",
-        "energy_prey_decay",
+        "energy_predator_resting_metabolic_cost",
+        "energy_prey_resting_metabolic_cost",
         "energy_predator_speed_cost",
         "energy_prey_speed_cost",
         "energy_predator_acceleration_cost",

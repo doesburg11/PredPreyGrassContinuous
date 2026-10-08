@@ -32,14 +32,15 @@ reference sections.
 | Wall geometry validation | Nonfinite coordinates and sizes, undersized walls, and rectangles larger than the arena are rejected; origins are normalized so collisions, sight, sensing and rendering use the same geometry |
 | Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
 | Direction and target speed | New configurations enable 16 directions at full, half or stopped speed; acceleration and braking remain controlled by physics |
-| Movement energy costs | Actual speed squared and change in velocity squared add to resting decay each physics step; speed is measured after wall resolution |
+| Movement energy costs | Resting metabolic cost plus actual speed squared each physics step; acceleration energy costs are explicitly zero for the initial experiment; speed is measured after wall resolution |
 | Occluded view cones | The viewer clips each view cone at the walls, so the drawn cone shows what an animal can see; one predator and one prey are followed, switching when it dies |
 | Regression coverage | Tests cover wall geometry, wrapping, visibility, open-space placement, target speeds, braking, movement costs, newborn action spaces and PPO's expanded action outputs |
 
 Walls default to the `"blocks"` layout (`walls_layout = None` switches them off). Target-speed controls
-and movement costs are enabled in the current configuration; they were also
-added to `add_reproduction`. Older checkpoint configurations keep their original
-16-action controls and fixed metabolic decay.
+and movement costs are enabled in the current configuration; they exist only
+in `add_walls` (`add_reproduction` keeps its 16 full-speed actions). Older
+checkpoint configurations keep their original 16-action controls and fixed
+resting metabolic cost.
 
 Aquarium's `observable_walls` parameter does not construct these obstacles:
 its border-observation calls are commented out in the installed package. Our
@@ -70,7 +71,7 @@ check out its commit, apply the patch if there is one, and train with its
 
 ## Reproduction
 
-After movement, catches, grass, energy decay and starvation, every living
+After movement, catches, grass, metabolic costs and starvation, every living
 animal at or above its species' threshold has one offspring. A step can
 produce at most one offspring per parent.
 
@@ -177,8 +178,12 @@ Grass below).
 | `energy_prey_initial` | 3.0 | Prey energy at reset and at birth |
 | `energy_predator_max` | 24.0 | Predator energy cap |
 | `energy_prey_max` | 16.0 | Prey energy cap |
-| `energy_predator_decay` | 0.15 / 8 | Predator energy lost per physics step |
-| `energy_prey_decay` | 0.05 / 8 | Prey energy lost per physics step |
+| `energy_predator_resting_metabolic_cost` | 0.15 / 8 | Predator resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_prey_resting_metabolic_cost` | 0.05 / 8 | Prey resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_predator_speed_cost` | 0.15 / 8 / (2 * 5²) | Predator coefficient multiplying actual speed squared |
+| `energy_prey_speed_cost` | 0.05 / 8 / (2 * 5²) | Prey coefficient multiplying actual speed squared |
+| `energy_predator_acceleration_cost` | 0.0 | Disabled: no separate predator acceleration energy cost |
+| `energy_prey_acceleration_cost` | 0.0 | Disabled: no separate prey acceleration energy cost |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
 | `energy_catch_efficiency_predator` | 0.5 | Share of a caught prey's energy its catcher gains |
 | `predator_max_age` | 10^9 | Aquarium's own starvation clock, kept off |
@@ -187,13 +192,13 @@ These use PredPreyGrass's energy units, with its per-step rates divided by 8,
 because crossing this arena takes about 8 times as many steps as crossing
 its grid. PredPreyGrass has no energy cap. Here the caps are set at twice the
 reproduction thresholds, so they rarely bind and mainly scale each agent's
-own-energy input (energy / max). With resting decay alone and no food, a
+own-energy input (energy / max). With the resting metabolic cost alone and no food, a
 predator starves after 267 steps and a prey after 480 steps. Movement costs
 shorten those lifetimes when enabled.
 
 Each step, catching predators gain catch_efficiency_predator times the prey's energy,
 prey gain energy per grass patch eaten, and every animal loses its resting
-decay plus the configured speed and acceleration costs (see
+metabolic cost plus the configured speed cost; acceleration energy costs are zero (see
 [Direction and target speed](#direction-and-target-speed)).
 Animals at or below zero energy starve: they are removed and terminated, with
 `infos[agent]["starved"] = True`. Reproduction follows. The episode ends once
@@ -462,25 +467,34 @@ separately. Existing scripted direction policies continue to request full speed.
 Random evaluation samples all 48 actions, and PPO learns a categorical policy
 over all direction/speed combinations.
 
-Energy loss is charged after movement on every physics step:
+For the initial experiment, energy loss is charged after movement on every
+physics step using **resting cost and speed only**:
 
 ```text
-resting decay + speed coefficient * actual speed squared
-              + acceleration coefficient * actual change in velocity squared
+energy loss = resting cost + speed cost × actual speed²
 ```
 
-The coefficients are `energy_predator_speed_cost`, `energy_prey_speed_cost`,
-`energy_predator_acceleration_cost`, and `energy_prey_acceleration_cost`.
-Braking, turns and collision-induced changes in velocity also count. In
-`add_walls`, speed is measured after wall collision resolution, so a stationary
+Resting costs are `energy_predator_resting_metabolic_cost` and
+`energy_prey_resting_metabolic_cost`; speed coefficients are `energy_predator_speed_cost` and `energy_prey_speed_cost`.
+Both `energy_predator_acceleration_cost` and `energy_prey_acceleration_cost`
+are explicitly **0.0**. Acceleration, braking, turns and collision-induced
+velocity changes have no separate energy charge. Acceleration and braking
+limits still govern movement and thereby affect actual speed.
+
+The implementation retains an optional acceleration-cost term for future
+experiments, but its zero coefficients remove it from the current equation.
+In `add_walls`, speed is measured after wall collision resolution, so a stationary
 animal pushing against a wall pays no travelling cost. Repeated decisions
 pay separately for each physics step. Defaults make steady full-speed travel
-add half the existing resting decay, plus any acceleration cost; these are
+add half the existing resting metabolic cost; these are
 initial tuning values, not experimentally calibrated rates.
 
 Checkpoint evaluation uses the checkpoint's saved environment settings.
+Changing these defaults does not remove acceleration costs from a checkpoint
+that saved nonzero coefficients. To evaluate such a checkpoint without them,
+set both acceleration-cost keys to `0.0` in `config_eval.py`'s `env_overrides`.
 Older configurations omit the toggle and movement coefficients, retaining
-16 direction-only actions and fixed metabolic decay. New 48-action training
+16 direction-only actions and a fixed resting metabolic cost. New 48-action training
 requires new policies rather than loading the old 16-action network weights.
 To run legacy movement explicitly, set `target_speed_actions = False` and
 all four movement-energy coefficients to zero.

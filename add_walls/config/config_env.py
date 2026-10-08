@@ -100,15 +100,18 @@ config_env = {
     # only scale the own-energy input (energy / max).
     "energy_predator_max": 24.0,
     "energy_prey_max": 16.0,
-    "energy_predator_decay": 0.15 / 8,  # Lost per physics step.
-    "energy_prey_decay": 0.05 / 8,
-    # Per physics step: resting decay + speed_cost * speed^2
-    # + acceleration_cost * change_in_velocity^2 (actual arena units).
+    # Resting metabolic cost: lost every physics step, even when stopped.
+    "energy_predator_resting_metabolic_cost": 0.15 / 8,
+    "energy_prey_resting_metabolic_cost": 0.05 / 8,
+    # Per physics step: resting metabolic cost + speed_cost * speed^2
+    # Actual speed is in arena units. Acceleration has NO separate energy cost.
     # Full speed adds half the resting cost; these are initial tuning values.
     "energy_predator_speed_cost": 0.15 / 8 / (2 * 5**2),
     "energy_prey_speed_cost": 0.05 / 8 / (2 * 5**2),
-    "energy_predator_acceleration_cost": 0.001875,
-    "energy_prey_acceleration_cost": 0.000625,
+    # Keep these zero for the initial resting + speed^2 experiment.
+    # Acceleration/braking limits still apply to movement physics.
+    "energy_predator_acceleration_cost": 0.0,
+    "energy_prey_acceleration_cost": 0.0,
     "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
     # Share of a caught prey's energy the catching predator gains (PPG: 1.0).
     "energy_catch_efficiency_predator": 0.5,

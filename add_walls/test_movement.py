@@ -24,8 +24,8 @@ def environment(**overrides):
         "energy_prey_initial": 10,
         "energy_predator_max": 20,
         "energy_prey_max": 20,
-        "energy_predator_decay": 0,
-        "energy_prey_decay": 0,
+        "energy_predator_resting_metabolic_cost": 0,
+        "energy_prey_resting_metabolic_cost": 0,
         "action_repeat": 1,
         "max_time_steps": 200,
     }
@@ -74,7 +74,7 @@ def test_initial_acceleration_and_turning_are_limited():
 
 def test_energy_uses_actual_speed_and_velocity_change():
     env, obs, raw = environment(
-        energy_predator_decay=0.1,
+        energy_predator_resting_metabolic_cost=0.1,
         energy_predator_speed_cost=0.2,
         energy_predator_acceleration_cost=0.3,
     )
@@ -89,7 +89,7 @@ def test_energy_uses_actual_speed_and_velocity_change():
 
 def test_stationary_agent_pays_only_resting_cost():
     env, obs, raw = environment(
-        energy_predator_decay=0.1,
+        energy_predator_resting_metabolic_cost=0.1,
         energy_predator_speed_cost=1,
         energy_predator_acceleration_cost=1,
     )
@@ -205,7 +205,7 @@ def test_wall_blocked_command_does_not_charge_target_speed():
     env, obs, raw = environment(
         walls_layout="custom",
         walls_rectangles=[(380, 100, 40, 600)],
-        energy_predator_decay=0.1,
+        energy_predator_resting_metabolic_cost=0.1,
         energy_predator_speed_cost=1,
         energy_predator_acceleration_cost=1,
     )

@@ -1,4 +1,4 @@
-"""Metabolic energy for the energy experiment: decay, food, and starvation."""
+"""Metabolic energy for the energy experiment: costs, food, and starvation."""
 
 import math
 
@@ -31,8 +31,8 @@ class EnergyLayer:
         prey_initial=3.0,
         predator_max=12.0,
         prey_max=8.0,
-        predator_decay=0.15 / 8,
-        prey_decay=0.05 / 8,
+        predator_resting_metabolic_cost=0.15 / 8,
+        prey_resting_metabolic_cost=0.05 / 8,
         predator_speed_cost=0.0,
         prey_speed_cost=0.0,
         predator_acceleration_cost=0.0,
@@ -45,8 +45,8 @@ class EnergyLayer:
             "prey_initial": (prey_initial, True),
             "predator_max": (predator_max, True),
             "prey_max": (prey_max, True),
-            "predator_decay": (predator_decay, False),
-            "prey_decay": (prey_decay, False),
+            "predator_resting_metabolic_cost": (predator_resting_metabolic_cost, False),
+            "prey_resting_metabolic_cost": (prey_resting_metabolic_cost, False),
             "predator_speed_cost": (predator_speed_cost, False),
             "prey_speed_cost": (prey_speed_cost, False),
             "predator_acceleration_cost": (predator_acceleration_cost, False),
@@ -75,7 +75,10 @@ class EnergyLayer:
             raise ValueError("energy_catch_efficiency_predator must be in [0, 1]")
         self.initial = {"predator": predator_initial, "prey": prey_initial}
         self.max = {"predator": predator_max, "prey": prey_max}
-        self.decay = {"predator": predator_decay, "prey": prey_decay}
+        self.resting_metabolic_cost = {
+            "predator": predator_resting_metabolic_cost,
+            "prey": prey_resting_metabolic_cost,
+        }
         self.speed_cost = {"predator": predator_speed_cost, "prey": prey_speed_cost}
         self.acceleration_cost = {
             "predator": predator_acceleration_cost,
@@ -100,12 +103,12 @@ def patch_energy(raw_env, **settings):
 
     Each step, after Aquarium's movement and captures and after grass is
     eaten: catching predators gain catch_efficiency_predator times the prey's
-    energy,
-    prey gain grass_gain per patch eaten, every living animal loses its
-    species' decay, and animals at or below zero energy starve: they are
-    removed like a caught prey and terminated. The episode ends once no
-    predator or no prey is left. Every agent observes one more input, its
-    own energy as a fraction of its species' maximum.
+    energy, prey gain grass_gain per patch eaten, every living animal loses
+    its species' resting metabolic cost plus any movement costs, and animals
+    at or below zero energy starve: they are removed like a caught prey and
+    terminated. The episode ends once no predator or no prey is left. Every
+    agent observes one more input, its own energy as a fraction of its
+    species' maximum.
 
     Requires keep_prey_count_constant=False: a respawned prey would need a
     separate rule for its energy, and starvation needs permanent death.
@@ -190,7 +193,7 @@ def patch_energy(raw_env, **settings):
             delta = entity.velocity.copy()
             delta.sub(previous_velocity[entity.id()])
             cost = (
-                layer.decay[species]
+                layer.resting_metabolic_cost[species]
                 + layer.speed_cost[species] * entity.velocity.mag() ** 2
                 + layer.acceleration_cost[species] * delta.mag() ** 2
             )

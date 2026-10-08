@@ -24,7 +24,8 @@ trained with RLlib's new API stack (RLModule + Learner).
   [RESULTS](add_reproduction/RESULTS.md) for the log of all training runs
   and what they showed.
 - [`add_walls/`](add_walls/) — `add_reproduction` plus walls that block
-  movement and sight, so animals can hide, and observations computed once per
+  movement and sight, so animals can hide, actions at full speed, half speed
+  or stopped with movement energy costs, and observations computed once per
   decision to reduce environment-stepping overhead. See its
   [README](add_walls/README.md).
 

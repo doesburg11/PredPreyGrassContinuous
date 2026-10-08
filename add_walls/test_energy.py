@@ -1,4 +1,4 @@
-"""Energy decay, food, catches, starvation, observations, and rendering."""
+"""Metabolic costs, food, catches, starvation, observations, and rendering."""
 
 import numpy as np
 import pytest
@@ -18,8 +18,8 @@ BASE = {
     "energy_prey_initial": 50.0,
     "energy_predator_max": 200.0,
     "energy_prey_max": 100.0,
-    "energy_predator_decay": 1.0,
-    "energy_prey_decay": 0.5,
+    "energy_predator_resting_metabolic_cost": 1.0,
+    "energy_prey_resting_metabolic_cost": 0.5,
     "energy_grass_gain": 20.0,
     "energy_catch_efficiency_predator": 0.5,
 }
@@ -52,7 +52,7 @@ def idle(env, obs):
     "settings",
     [
         {"prey_initial": 0},
-        {"predator_decay": -1},
+        {"predator_resting_metabolic_cost": -1},
         {"grass_gain": float("nan")},
         {"catch_efficiency_predator": 1.5},
         {"prey_initial": 150, "prey_max": 100},
