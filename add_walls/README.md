@@ -4,8 +4,14 @@ A contained copy of `add_reproduction` that adds **walls**: obstacles that
 block movement and sight, so prey can hide from predators and predators can
 ambush prey, as in PredPreyGrass's `walls_occlusion` experiments (see
 [Walls](#walls) below). Walls are set with `walls_layout` in
-`config/config_env.py` (default `"blocks"`); with `walls_layout = None` the
-module behaves like `add_reproduction`.
+`config/config_env.py` (default `"blocks"`). It also adds actions at full
+speed, half speed or stopped, with an energy cost linear in speed (see
+[Direction and target speed](#direction-and-target-speed)). It behaves
+like `add_reproduction` with `walls_layout = None`,
+`target_speed_actions = False`, the speed and acceleration costs at 0 and
+the resting metabolic costs at `add_reproduction`'s decay (0.15 / 8 and
+0.05 / 8). The training runs
+and their results are logged in [RESULTS.md](RESULTS.md).
 
 This module also computes observations once per decision instead of after
 every physics step to reduce environment-stepping overhead. Physics, food,

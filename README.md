@@ -27,7 +27,8 @@ trained with RLlib's new API stack (RLModule + Learner).
   movement and sight, so animals can hide, actions at full speed, half speed
   or stopped with movement energy costs, and observations computed once per
   decision to reduce environment-stepping overhead. See its
-  [README](add_walls/README.md).
+  [README](add_walls/README.md), and its
+  [RESULTS](add_walls/RESULTS.md) for its training runs.
 
 ## Grass: from static patches to moving clusters
 

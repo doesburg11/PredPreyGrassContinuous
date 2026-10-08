@@ -8,11 +8,11 @@ config_eval = {
     # What to run: "checkpoint" (a trained run, below), "random" (every agent
     # acts uniformly at random, as a baseline), or "recommended" (the older
     # 28-input dying_prey models; they do not fit this module's observations).
-    "source": "random",  # add_walls has no trained runs yet.
+    "source": "checkpoint",
     # A run's checkpoint/ directory (its final model) or one of its
     # checkpoint/iter_<n> directories. Only for "checkpoint".
     # Set to a run's checkpoint/ (or checkpoint/iter_<n>) once one exists.
-    "checkpoint": str(RUNS_DIR / "<run>" / "checkpoint"),
+    "checkpoint": str(RUNS_DIR / "add_walls_2026-10-08_11-27-42_148248" / "checkpoint"),
     "model_seed": 0,  # Which recommended model (0, 1 or 2). Only for "recommended".
     "episodes": 1,
     "seed": 0,  # Seed of the first episode; episode k uses seed + k - 1.
