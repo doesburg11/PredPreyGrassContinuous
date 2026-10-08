@@ -17,7 +17,7 @@ are as defined in the add_reproduction log.
 |---|---|---|---:|---|---|
 | N | `2026-10-08_11-27-42_148248` | scratch | 1,000 | walls, speed actions, linear movement cost | completed |
 | O | `2026-10-08_16-02-39_634931` | N final | 2,000 | continuation of N | completed |
-| P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | running |
+| P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | completed |
 
 Launchers: `runs/continue_walls.py` (O) and `runs/no_walls_control.py` (P).
 
@@ -109,15 +109,66 @@ removes the walls to find out.
 
 ## 11. Control without walls (run P)
 
-Running. Same settings as run N with `walls_layout = None`, 1,000 iterations
-from scratch. If the prey survive here, the walls are what favour predators;
-if not, the speed actions or the movement cost are.
+Same settings as run N with `walls_layout = None` (so also no wall rays in
+the observations), 1,000 iterations from scratch (about 1.7 hours). Per
+episode, in blocks of 250 iterations:
+
+| Iterations | Predator births | Prey births | Episode length (decisions) | Run N, same iterations |
+|---|---:|---:|---:|---:|
+| 1–250 | 8.3 | 47 | 136 | 142 |
+| 251–500 | 7.7 | 43 | 115 | 103 |
+| 501–750 | 7.3 | 41 | 109 | 98 |
+| 751–1000 | 7.1 | 41 | 110 | 107 |
+
+**Final check** (`final_check.csv`, iteration 990): **0 of 20 coexisting**,
+prey extinct in all 20. Averages per episode: length 455 physics steps
+(run N: 718), catch risk 10.71 (run N: 9.57), 40 prey caught and 32 born,
+no prey starving.
+
+**Tournament** (checkpoints every 100 iterations, 10 episodes per matchup;
+`tournament.csv`): prey died out in all 1,000 episodes. Newer prey are
+harder to catch in **79%** of pairs, newer predators catch more in **69%**.
+
+| Checkpoint | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 9.1 | 9.8 | 10.5 | 10.1 | 10.8 | 11.0 | 10.4 | 11.0 | 10.7 | 10.8 |
+| Prey: catch risk averaged over all predators | 12.9 | 11.4 | 10.6 | 10.7 | 10.4 | 9.8 | 9.8 | 9.6 | 9.4 | 9.7 |
+
+Same stage, three worlds (final checks after 1,000 iterations, all with
+prey extinct in 20 of 20 episodes):
+
+| Run | Walls | Speed actions and speed-dependent cost | Episode length (physics steps) | Catch risk |
+|---|---|---|---:|---:|
+| L (add_reproduction) | no | no | 1,178 | 7.78 |
+| N | yes | yes | 718 | 9.57 |
+| P | no | yes | 455 | 10.71 |
+
+**Conclusion:** the walls are not what favours the predators. Without them
+the prey do slightly worse (catch risk 10.7 against 9.6, episodes about a
+third shorter): blocks give prey some cover. What separates runs N and P
+from run L is the action space (speed actions) and the energy cost that
+depends on speed; with them, prey are caught about 25–40% more often at the
+same stage. After 1,000 iterations run L's prey did not survive either; the
+difference that matters is that run L's prey then caught up (run M: 10 of 20
+coexisting at 4,000 iterations), while run O's prey barely gained in 2,000
+more iterations. Run P was not continued, so it does not show whether its
+prey would catch up.
+
+With 16 full-speed actions, the linear cost equals run L's fixed cost, so
+run L is in effect the control for "no speed actions" (an animal
+slowed by turning pays slightly less). Separating the speed
+actions from the speed-dependent cost needs one more run: speed actions with
+run L's fixed per-step cost.
 
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
    to catch:** 0 of 20 coexisting after 3,000 iterations, against 10 of 20
    without them (run M), with catch risk 8.1 against 2.9.
-2. **Both species keep improving in this world** (81% and 67% of tournament
-   pairs), the closest to co-adaptation so far, though predators improve
-   much more slowly after the first few hundred iterations.
+2. **The walls are not the cause** (run P): without walls the prey do
+   slightly worse. The speed actions or the speed-dependent energy cost
+   make prey 25–40% easier to catch than in run L at the same stage.
+3. **Both species keep improving in this world** (81% and 67% of tournament
+   pairs; run P: 79% and 69%), the closest to co-adaptation so far, though
+   predators improve much more slowly after the first few hundred
+   iterations.
