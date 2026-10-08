@@ -100,15 +100,18 @@ config_env = {
     # only scale the own-energy input (energy / max).
     "energy_predator_max": 24.0,
     "energy_prey_max": 16.0,
+    # Split the original decay equally between resting and full-speed movement.
+    # Total at speed 5 equals the original rate (predator 0.15/8, prey 0.05/8).
     # Resting metabolic cost: lost every physics step, even when stopped.
-    "energy_predator_resting_metabolic_cost": 0.15 / 8,
-    "energy_prey_resting_metabolic_cost": 0.05 / 8,
-    # Per physics step: resting metabolic cost + speed_cost * speed^2
+    "energy_predator_resting_metabolic_cost": 0.15 / 8 / 2,
+    "energy_prey_resting_metabolic_cost": 0.05 / 8 / 2,
+    # Per physics step: resting metabolic cost + speed_cost * speed, linear in
+    # speed as for running animals (Taylor, Heglund & Maloiy 1982; README).
     # Actual speed is in arena units. Acceleration has NO separate energy cost.
-    # Full speed adds half the resting cost; these are initial tuning values.
-    "energy_predator_speed_cost": 0.15 / 8 / (2 * 5**2),
-    "energy_prey_speed_cost": 0.05 / 8 / (2 * 5**2),
-    # Keep these zero for the initial resting + speed^2 experiment.
+    # Full speed adds the other half of the original decay.
+    "energy_predator_speed_cost": 0.15 / 8 / (2 * 5),
+    "energy_prey_speed_cost": 0.05 / 8 / (2 * 5),
+    # Keep these zero for the initial resting + speed experiment.
     # Acceleration/braking limits still apply to movement physics.
     "energy_predator_acceleration_cost": 0.0,
     "energy_prey_acceleration_cost": 0.0,

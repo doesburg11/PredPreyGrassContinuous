@@ -81,7 +81,7 @@ def test_energy_uses_actual_speed_and_velocity_change():
     try:
         env.step({a: 4 for a in obs})
         assert raw.predators[0].energy == pytest.approx(
-            10 - 0.1 - 0.2 * 0.6**2 - 0.3 * 0.6**2
+            10 - 0.1 - 0.2 * 0.6 - 0.3 * 0.6**2
         )
     finally:
         env.close()
@@ -110,7 +110,7 @@ def test_movement_cost_is_charged_per_repeated_physics_step():
     try:
         env.step({a: 4 for a in obs})
         expected = 10 - sum(
-            0.2 * (0.6 * step) ** 2 + 0.3 * 0.6**2 for step in range(1, 5)
+            0.2 * 0.6 * step + 0.3 * 0.6**2 for step in range(1, 5)
         )
         assert raw.predators[0].energy == pytest.approx(expected)
     finally:

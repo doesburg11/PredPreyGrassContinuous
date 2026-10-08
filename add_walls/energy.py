@@ -194,7 +194,7 @@ def patch_energy(raw_env, **settings):
             delta.sub(previous_velocity[entity.id()])
             cost = (
                 layer.resting_metabolic_cost[species]
-                + layer.speed_cost[species] * entity.velocity.mag() ** 2
+                + layer.speed_cost[species] * entity.velocity.mag()
                 + layer.acceleration_cost[species] * delta.mag() ** 2
             )
             entity.energy = layer.energy(entity) - cost

@@ -32,7 +32,7 @@ reference sections.
 | Wall geometry validation | Nonfinite coordinates and sizes, undersized walls, and rectangles larger than the arena are rejected; origins are normalized so collisions, sight, sensing and rendering use the same geometry |
 | Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
 | Direction and target speed | New configurations enable 16 directions at full, half or stopped speed; acceleration and braking remain controlled by physics |
-| Movement energy costs | Resting metabolic cost plus actual speed squared each physics step; acceleration energy costs are explicitly zero for the initial experiment; speed is measured after wall resolution |
+| Movement energy costs | Resting metabolic cost plus a cost linear in actual speed each physics step; acceleration energy costs are explicitly zero for the initial experiment; speed is measured after wall resolution |
 | Occluded view cones | The viewer clips each view cone at the walls, so the drawn cone shows what an animal can see; one predator and one prey are followed, switching when it dies |
 | Regression coverage | Tests cover wall geometry, wrapping, visibility, open-space placement, target speeds, braking, movement costs, newborn action spaces and PPO's expanded action outputs |
 
@@ -178,10 +178,10 @@ Grass below).
 | `energy_prey_initial` | 3.0 | Prey energy at reset and at birth |
 | `energy_predator_max` | 24.0 | Predator energy cap |
 | `energy_prey_max` | 16.0 | Prey energy cap |
-| `energy_predator_resting_metabolic_cost` | 0.15 / 8 | Predator resting metabolic cost: energy lost every physics step, even when stopped |
-| `energy_prey_resting_metabolic_cost` | 0.05 / 8 | Prey resting metabolic cost: energy lost every physics step, even when stopped |
-| `energy_predator_speed_cost` | 0.15 / 8 / (2 * 5²) | Predator coefficient multiplying actual speed squared |
-| `energy_prey_speed_cost` | 0.05 / 8 / (2 * 5²) | Prey coefficient multiplying actual speed squared |
+| `energy_predator_resting_metabolic_cost` | 0.15 / 8 / 2 | Predator resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_prey_resting_metabolic_cost` | 0.05 / 8 / 2 | Prey resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_predator_speed_cost` | 0.15 / 8 / (2 * 5) | Predator coefficient multiplying actual speed |
+| `energy_prey_speed_cost` | 0.05 / 8 / (2 * 5) | Prey coefficient multiplying actual speed |
 | `energy_predator_acceleration_cost` | 0.0 | Disabled: no separate predator acceleration energy cost |
 | `energy_prey_acceleration_cost` | 0.0 | Disabled: no separate prey acceleration energy cost |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
@@ -193,8 +193,9 @@ because crossing this arena takes about 8 times as many steps as crossing
 its grid. PredPreyGrass has no energy cap. Here the caps are set at twice the
 reproduction thresholds, so they rarely bind and mainly scale each agent's
 own-energy input (energy / max). With the resting metabolic cost alone and no food, a
-predator starves after 267 steps and a prey after 480 steps. Movement costs
-shorten those lifetimes when enabled.
+predator starves after 534 steps and a prey after 960 steps. At steady full
+speed (5 units per step), total loss matches the original decay: predators
+starve after 267 steps and prey after 480 steps without food.
 
 Each step, catching predators gain catch_efficiency_predator times the prey's energy,
 prey gain energy per grass patch eaten, and every animal loses its resting
@@ -471,11 +472,12 @@ For the initial experiment, energy loss is charged after movement on every
 physics step using **resting cost and speed only**:
 
 ```text
-energy loss = resting cost + speed cost × actual speed²
+energy loss = resting cost + speed cost × actual speed
 ```
 
 Resting costs are `energy_predator_resting_metabolic_cost` and
-`energy_prey_resting_metabolic_cost`; speed coefficients are `energy_predator_speed_cost` and `energy_prey_speed_cost`.
+`energy_prey_resting_metabolic_cost`; speed coefficients are
+`energy_predator_speed_cost` and `energy_prey_speed_cost`.
 Both `energy_predator_acceleration_cost` and `energy_prey_acceleration_cost`
 are explicitly **0.0**. Acceleration, braking, turns and collision-induced
 velocity changes have no separate energy charge. Acceleration and braking
@@ -483,11 +485,61 @@ limits still govern movement and thereby affect actual speed.
 
 The implementation retains an optional acceleration-cost term for future
 experiments, but its zero coefficients remove it from the current equation.
-In `add_walls`, speed is measured after wall collision resolution, so a stationary
-animal pushing against a wall pays no travelling cost. Repeated decisions
-pay separately for each physics step. Defaults make steady full-speed travel
-add half the existing resting metabolic cost; these are
-initial tuning values, not experimentally calibrated rates.
+In `add_walls`, speed is measured after wall collision resolution, so a
+stationary animal pushing against a wall pays no travelling cost. Repeated
+decisions pay separately for each physics step. The calibration splits the
+original decay equally between resting and movement at speed 5, preserving
+the original total at full speed. With acceleration energy costs zero, the
+total is `original_decay * (0.5 + 0.5 * actual_speed / 5)`.
+
+| Actual speed | Predator loss / physics step | Prey loss / physics step | Share of original decay |
+|---|---:|---:|---:|
+| Stopped (0) | 0.009375 | 0.003125 | 50% |
+| Half speed (2.5) | 0.0140625 | 0.0046875 | 75% |
+| Full speed (5) | 0.01875 | 0.00625 | 100% |
+
+This calibration uses speed 5 as the reference; changing maximum speeds also
+requires revisiting the speed coefficients to preserve the full-speed total.
+
+### Why the cost is linear in speed
+
+The animals here run on land, so the movement cost follows measurements of
+running animals rather than swimming ones. Taylor, Heglund and Maloiy (1982)
+measured oxygen consumption of 62 species of mammals and birds, from mice to
+horses, running on treadmills. In every species, metabolic power rose
+**linearly** with running speed over a wide range of speeds:
+
+```text
+metabolic power ≈ intercept + slope × speed
+```
+
+Dividing by speed gives the energy spent per metre: `slope + intercept /
+speed`. The part due to moving, the slope, is the same at every speed (the
+"minimum cost of transport"). Covering a metre therefore costs the same extra
+energy whether an animal walks or runs, and the total cost per metre even
+falls at higher speeds, because the fixed cost is spread over more metres.
+The slope also scales with body mass to about the -0.3 power, so per kilogram,
+small animals pay more to move than large ones.
+
+Squared or cubed costs belong to animals moving through a fluid: drag on a
+swimmer or a flier rises with speed squared, so the power needed to overcome
+it rises with speed cubed. Aquarium's fish-like setting would suggest that,
+but in this ecosystem a speed-squared cost would make slow movement
+unrealistically cheap: half speed would cost only half of full speed's extra
+energy per metre, an energy reason to always creep. With the linear cost, the
+real choice is between moving and standing still, the trade-off that waiting
+and ambushing are about.
+
+Two simplifications remain. Taylor et al. found the line's zero-speed
+intercept above resting metabolism (a postural cost of standing ready to
+move); here a stopped animal pays the resting cost only. And their line holds
+within the range of steady running speeds, without the costs of speeding up,
+braking or turning, which the zero acceleration costs leave out.
+
+Reference: C. R. Taylor, N. C. Heglund and G. M. O. Maloiy (1982). Energetics
+and mechanics of terrestrial locomotion. I. Metabolic energy consumption as a
+function of speed and body size in birds and mammals. *Journal of
+Experimental Biology* 97, 1-21.
 
 Checkpoint evaluation uses the checkpoint's saved environment settings.
 Changing these defaults does not remove acceleration costs from a checkpoint
