@@ -452,7 +452,6 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         energy_config=None,
         reproduction_config=None,
         render_window_size=None,
-        target_speed_actions=False,
     ):
         if obs_stack < 1:
             raise ValueError(f"obs_stack must be >= 1, got {obs_stack}")
@@ -463,12 +462,6 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         raw_env = env.aec_env.unwrapped
         # Patch before super().__init__, which resets the env and snapshots
         # the observation spaces.
-        if type(target_speed_actions) is not bool:
-            raise ValueError("target_speed_actions must be True or False")
-        if target_speed_actions:
-            from movement import patch_target_speed
-
-            patch_target_speed(raw_env)
         _patch_torus_view(raw_env)
         _patch_predator_vision(raw_env)
         _patch_predator_catch_rewards(raw_env)
@@ -696,7 +689,6 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
       an agent ID it can't enumerate ahead of time.
     """
     env_config = dict(env_config or {})
-    target_speed_actions = env_config.pop("target_speed_actions", False)
     reward_scale = env_config.pop("reward_scale", 1.0)
     obs_mode = env_config.pop("obs_mode", None)
     predator_shaping = env_config.pop("predator_shaping", 0.0)
@@ -733,10 +725,6 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "energy_prey_max",
         "energy_predator_decay",
         "energy_prey_decay",
-        "energy_predator_speed_cost",
-        "energy_prey_speed_cost",
-        "energy_predator_acceleration_cost",
-        "energy_prey_acceleration_cost",
         "energy_grass_gain",
         "energy_catch_efficiency_predator",
     )
@@ -792,7 +780,6 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         energy_config=energy_config,
         reproduction_config=reproduction_config,
         render_window_size=render_window_size,
-        target_speed_actions=target_speed_actions,
     )
 
 
