@@ -18,8 +18,10 @@ are as defined in the add_reproduction log.
 | N | `2026-10-08_11-27-42_148248` | scratch | 1,000 | walls, speed actions, linear movement cost | completed |
 | O | `2026-10-08_16-02-39_634931` | N final | 2,000 | continuation of N | completed |
 | P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | completed |
+| Q | `2026-10-08_22-52-21_564755` | scratch | 1,000 | as P, with run L's fixed energy cost (control) | completed |
 
-Launchers: `runs/continue_walls.py` (O) and `runs/no_walls_control.py` (P).
+Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
+`runs/fixed_cost_control.py` (Q).
 
 ## Settings compared with run L
 
@@ -156,9 +158,59 @@ prey would catch up.
 
 With 16 full-speed actions, the linear cost equals run L's fixed cost, so
 run L is in effect the control for "no speed actions" (an animal
-slowed by turning pays slightly less). Separating the speed
-actions from the speed-dependent cost needs one more run: speed actions with
-run L's fixed per-step cost.
+slowed by turning pays slightly less). Run Q separates the speed actions
+from the speed-dependent cost.
+
+## 12. Speed actions with a fixed energy cost (run Q)
+
+Same settings as run P (speed actions, no walls), but with run L's fixed
+energy cost: `energy_*_resting_metabolic_cost` 0.15 / 8 and 0.05 / 8, and
+speed and acceleration costs 0. Standing still saves no energy. 1,000
+iterations from scratch. Per episode, in blocks of 250 iterations:
+
+| Iterations | Predator births | Prey births | Episode length (decisions) | Run P length | Run L length |
+|---|---:|---:|---:|---:|---:|
+| 1–250 | 19.4 | 146 | 412 | 136 | 132 |
+| 251–500 | 12.8 | 101 | 279 | 115 | 86 |
+| 501–750 | 13.3 | 109 | 302 | 109 | 105 |
+| 751–1000 | 14.6 | 123 | 340 | 110 | 139 |
+
+**Final checks after 1,000 iterations** (20 episodes each):
+
+| Run | Walls | Speed actions | Energy cost | Prey extinct | Length (physics steps) | Catch risk | Predators starved |
+|---|---|---|---|---:|---:|---:|---:|
+| L | no | no | fixed | 20 | 1,178 | 7.78 | 5.4 |
+| N | yes | yes | speed-dependent | 20 | 718 | 9.57 | 2.6 |
+| P | no | yes | speed-dependent | 20 | 455 | 10.71 | 0.8 |
+| **Q** | no | yes | **fixed** | **18** | **1,924** | **4.84** | **10.8** |
+
+Run Q's other two episodes: one reached the time limit with both species
+alive, in one the predators died out. Per episode, 112 prey were caught and
+111 born, and 2.9 prey starved.
+
+**Tournament** (checkpoints every 100 iterations, 10 episodes per matchup;
+`tournament.csv`): prey died out in 881 of 1,000 episodes, both species
+survived in 97 (66 of them against the iteration-100 predators), predators
+died out in 22. Newer prey are harder to catch in **80%** of pairs, newer
+predators catch more in **71%**; in the second half (iterations 600–990) 62%
+and 36%. Coexistence rises with the prey checkpoint (0% with prey 100, 22%
+with prey 990, averaged over predators).
+
+| Checkpoint | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 3.7 | 5.0 | 5.9 | 6.7 | 6.1 | 6.5 | 7.5 | 6.9 | 6.3 | 6.6 |
+| Prey: catch risk averaged over all predators | 8.1 | 7.3 | 6.5 | 6.4 | 6.0 | 5.9 | 5.6 | 5.3 | 5.2 | 4.8 |
+
+**Conclusion:** the speed-dependent energy cost, not the speed actions, is
+what turned the balance against the prey. With a fixed cost, the same speed
+actions give the best prey results of any run at this stage: catch risk
+4.8, against 7.8 in run L and 10.7 in run P. The likely mechanism is
+predator starvation. With the speed-dependent cost, a predator that stops
+or walks pays only half its resting rate, so predators can wait cheaply and
+rarely starve (0.8 per episode in run P); with the fixed cost, waiting saves
+nothing and 10.8 predators starve per episode, which keeps their numbers
+and the pressure on the prey down. Prey, which mainly need to keep moving
+to escape, gain little from cheap slow movement.
 
 ## Findings so far
 
@@ -166,9 +218,12 @@ run L's fixed per-step cost.
    to catch:** 0 of 20 coexisting after 3,000 iterations, against 10 of 20
    without them (run M), with catch risk 8.1 against 2.9.
 2. **The walls are not the cause** (run P): without walls the prey do
-   slightly worse. The speed actions or the speed-dependent energy cost
-   make prey 25–40% easier to catch than in run L at the same stage.
-3. **Both species keep improving in this world** (81% and 67% of tournament
+   slightly worse.
+3. **The speed-dependent energy cost is the cause** (run Q): with the speed
+   actions and a fixed cost, prey are caught about 40% less often than in
+   run L and 55% less often than in run P at the same stage, and predators
+   starve again. Cheap waiting mainly helps the predators.
+4. **Both species keep improving in this world** (81% and 67% of tournament
    pairs; run P: 79% and 69%), the closest to co-adaptation so far, though
    predators improve much more slowly after the first few hundred
    iterations.
