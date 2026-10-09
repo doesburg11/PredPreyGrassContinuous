@@ -36,8 +36,10 @@ trained with RLlib's new API stack (RLModule + Learner).
   decision to reduce environment-stepping overhead. See its
   [README](add_walls/README.md), and its
   [RESULTS](add_walls/RESULTS.md) for its training runs.
-- [`add_group_hunting/`](add_group_hunting/) — a copy of `add_walls`, the
-  starting point for group hunting (not implemented yet). See its
+- [`add_group_hunting/`](add_group_hunting/) — `add_walls` (walls off) plus
+  group hunting: a catch is a contest between the summed energy of nearby
+  predators and the prey's energy, and is shared among the hunters; every
+  observed animal shows its energy. See its
   [README](add_group_hunting/README.md).
 
 ## Grass: from static patches to moving clusters

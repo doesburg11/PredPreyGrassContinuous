@@ -107,7 +107,7 @@ def patch_energy(raw_env, **settings):
 
     Each step, after Aquarium's movement and captures and after grass is
     eaten: catching predators gain catch_efficiency_predator times the prey's
-    energy, prey gain grass_gain per patch eaten, every living animal loses
+    energy (split equally among the hunters with group hunting), prey gain grass_gain per patch eaten, every living animal loses
     its species' resting metabolic cost plus any movement costs, and animals
     at or below zero energy starve: they are removed like a caught prey and
     terminated. The episode ends once no predator or no prey is left. Every
@@ -143,7 +143,7 @@ def patch_energy(raw_env, **settings):
         spaces[species] = Box(-1.0, 1.0, shape=(size,), dtype=np.float32)
     raw_env.number_of_predator_observations += extra
     raw_env.number_of_fish_observations += extra
-    catches = []  # (catching predator, prey energy) this step
+    catches = []  # (hunters, prey energy) per catch this step
 
     def get_obs():
         obs = original_obs()
@@ -165,8 +165,11 @@ def patch_energy(raw_env, **settings):
         # Aquarium's own collision test, on the state it is about to use.
         catcher = raw_env.torus.get_colliding_animal(prey, predators)
         result = original_update_prey(prey, predators, desired_velocity)
+        # Group hunting (group_hunting.py) names every hunter of a catch;
+        # otherwise the catcher hunts alone.
+        hunters = getattr(raw_env, "_catch_hunters", {}).pop(prey.id(), None)
         if not prey.alive and catcher is not None:
-            catches.append((catcher, layer.energy(prey)))
+            catches.append((hunters or [catcher], layer.energy(prey)))
         return result
 
     def starve(entity, obs, terms, truncs, infos):
@@ -193,9 +196,12 @@ def patch_energy(raw_env, **settings):
             for entity in raw_env.predators + raw_env.prey
         }
         obs, rewards, terms, truncs, infos = original_step(actions)
-        for predator, prey_energy in catches:
-            if predator.alive:
-                layer.gain(predator, layer.catch_efficiency_predator * prey_energy)
+        for hunters, prey_energy in catches:
+            # The catch is split equally among its hunters.
+            share = layer.catch_efficiency_predator * prey_energy / len(hunters)
+            for predator in hunters:
+                if predator.alive:
+                    layer.gain(predator, share)
         catches.clear()
         for prey in raw_env.prey:
             eaten = infos.get(prey.id(), {}).get("grass_eaten", 0)

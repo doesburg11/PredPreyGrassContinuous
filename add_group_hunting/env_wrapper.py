@@ -464,6 +464,7 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
         render_window_size=None,
         target_speed_actions=False,
         walls_config=None,
+        group_hunting_config=None,
     ):
         if obs_stack < 1:
             raise ValueError(f"obs_stack must be >= 1, got {obs_stack}")
@@ -504,6 +505,12 @@ class SafeParallelPettingZooEnv(ParallelPettingZooEnv):
             from energy import patch_energy
 
             patch_energy(raw_env, **energy_config)
+        if group_hunting_config is not None:
+            if energy_config is None:
+                raise ValueError("Group hunting requires energy settings")
+            from group_hunting import patch_group_hunting
+
+            patch_group_hunting(raw_env, **group_hunting_config)
         if reproduction_config is not None:
             if energy_config is None:
                 raise ValueError("Reproduction requires energy settings")
@@ -719,6 +726,9 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
       for both species (see energy.py);
     - `reproduction_*` settings: energy-threshold births with a fixed agent
       ID pool (see reproduction.py);
+    - `group_hunting_*` settings: a catch succeeds with a chance set by the
+      summed energy of nearby predators against the prey's energy, and is
+      shared among them (see group_hunting.py); off unless one is set;
     - `walls_*` settings: obstacles that block movement and sight, with
       wall-distance inputs for every agent (see walls.py); off unless
       walls_layout is set;
@@ -824,6 +834,19 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         }
     for key in walls_keys:  # walls off: drop their other settings
         env_config.pop(key, None)
+    group_hunting_keys = (
+        "group_hunting_radius",
+        "group_hunting_prey_strength",
+        "group_hunting_steepness",
+        "group_hunting_cooldown",
+    )
+    group_hunting_config = None
+    if any(key in env_config for key in group_hunting_keys):
+        group_hunting_config = {
+            key.removeprefix("group_hunting_"): env_config.pop(key)
+            for key in group_hunting_keys
+            if key in env_config
+        }
     render_window_size = env_config.pop("render_window_size", None)
     env_config.setdefault("render_mode", None)
     if env_config.get("procreate", False):
@@ -847,6 +870,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         render_window_size=render_window_size,
         target_speed_actions=target_speed_actions,
         walls_config=walls_config,
+        group_hunting_config=group_hunting_config,
     )
 
 

@@ -120,7 +120,9 @@ config_env = {
     "energy_prey_acceleration_cost": 0.0,
     "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
     # Share of a caught prey's energy the catching predator gains (PPG: 1.0).
-    "energy_catch_efficiency_predator": 0.5,
+    # 1.0 (PredPreyGrass's value) with group hunting, whose catches are split
+    # among the hunters: two hunters then get 0.5 each, a lone catch 1.0.
+    "energy_catch_efficiency_predator": 1.0,
     # Every observed animal also shows its energy (as a fraction of its
     # species' maximum), so predators can judge how strong a prey is and prey
     # how hungry a predator is: one more input per animal slot. False keeps
@@ -142,4 +144,16 @@ config_env = {
     # when a pool runs out. PredPreyGrass uses 2000.
     "reproduction_predator_pool": 2000,
     "reproduction_prey_pool": 2000,
+    # Group hunting (group_hunting.py): a predator touching a prey attacks,
+    # and succeeds with chance S^steepness / (S^steepness + (prey_strength *
+    # E)^steepness), S the summed energy of all predators within the radius
+    # (the attacker included), E the prey's energy. The catch is shared
+    # equally among those predators. Nothing forces teaming up: it pays only
+    # against strong prey, with steepness > 1. prey_strength 0: every attack
+    # succeeds, as in add_walls.
+    "group_hunting_radius": 64.0,  # Arena units; twice the catch distance.
+    "group_hunting_prey_strength": 2.0,
+    "group_hunting_steepness": 2.0,
+    # Physics steps a predator must wait after a failed attack on that prey.
+    "group_hunting_cooldown": 16,
 }

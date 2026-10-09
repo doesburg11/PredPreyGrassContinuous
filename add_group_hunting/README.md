@@ -1,16 +1,73 @@
 # Add group hunting
 
-A contained copy of [`add_walls`](../add_walls/), the starting point for
-**group hunting**: catches that need, or are easier with, several predators,
-so that coordination becomes a skill predators can keep refining. Group
-hunting itself is not implemented yet. The first step is done: every
-observed animal also shows its energy (`energy_observe_others`, see
+A contained copy of [`add_walls`](../add_walls/) that adds **group
+hunting**: a catch becomes a contest between the hunters and the prey, so
+that hunting together can pay off, without forcing it (see
+[Group hunting](#group-hunting) below). Every observed animal also shows its
+energy (`energy_observe_others`, see
 [Observations and display](#observations-and-display)), so predators can
-judge how strong a prey is. Otherwise this module behaves exactly like
-`add_walls`, described below, except that walls are off by
-default (`walls_layout = None`): the baseline is `add_walls` run T (speed
-actions, fixed energy cost, no walls), the healthiest ecosystem so far, in
-which predators stop improving early.
+judge how strong a prey is. Walls are off by default
+(`walls_layout = None`): without group hunting, this module's world is
+`add_walls` run T (speed actions, fixed energy cost, no walls), the
+healthiest ecosystem so far, in which predators stop improving early.
+
+## Group hunting
+
+When a predator touches a prey, it attacks. The attack succeeds with
+
+```text
+P(catch) = S^γ / (S^γ + (w · E)^γ)
+```
+
+- **S**: the summed energy of every predator within `group_hunting_radius`
+  of the prey, the attacker included. Helpers count by being close, not by
+  touching.
+- **E**: the prey's energy, so a well-fed prey is harder to catch.
+- **w** (`group_hunting_prey_strength`): how strong a prey is relative to
+  a predator. 0 makes every attack succeed, as in `add_walls`.
+- **γ** (`group_hunting_steepness`): how strongly the outcome follows the
+  balance of strength.
+
+This is a contest success function, as used in economics and conflict
+models. After a failed attack, that predator cannot attack that prey again
+for `group_hunting_cooldown` physics steps, so the prey can flee. Contact
+lasts several physics steps, and without a cooldown repeated rolls would
+make any chance nearly certain. When several predators touch the prey,
+they attack in random order until one succeeds. A successful catch's energy
+(`energy_catch_efficiency_predator` × E, with the efficiency 1.0 here, as
+in PredPreyGrass) is split equally among the hunters.
+
+Nothing forces cooperation: a lone predator can still catch, just less
+often, and the share of a group catch is smaller. Whether teaming up pays
+depends on the settings. Per attack, against a prey of energy 6 or 10, for
+a predator of energy 6:
+
+| γ, w | Prey energy | Alone | Pair (each member's share) |
+|---|---:|---:|---:|
+| 1, 1 | 6 | 0.50 | 0.67 (0.33) |
+| 2, 1 | 6 | 0.50 | 0.80 (0.40) |
+| 2, 2 | 6 | 0.20 | 0.50 (0.25) |
+| 2, 2 | 10 | 0.08 | 0.26 (0.13) |
+
+With γ = 1 a pair member's share is never higher than a lone predator's
+chance, so cooperation could not emerge. With γ = 2 and w = 2 (the
+defaults) it is higher against strong prey and lower against weak prey, so
+predators would have to learn when to team up. Pairs also catch sooner,
+which this per-attack table does not show.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `group_hunting_radius` | 64 | Distance from the prey within which predators count as hunters, in arena units (twice the catch distance) |
+| `group_hunting_prey_strength` | 2.0 | w; 0 switches the contest off |
+| `group_hunting_steepness` | 2.0 | γ |
+| `group_hunting_cooldown` | 16 | Physics steps a predator waits after a failed attack on that prey |
+
+Group hunting is on when any of these settings is present; it needs the
+energy settings. Each environment counts attacks, failed attacks and
+catches by number of hunters in `raw_env.group_hunting.stats` (reset every
+episode). Hunters are counted regardless of walls.
+
+## Inherited from add_walls
 
 `add_walls` adds **walls**: obstacles that
 block movement and sight, so prey can hide from predators and predators can
@@ -203,7 +260,7 @@ Grass below).
 | `energy_predator_acceleration_cost` | 0.0 | Disabled: no separate predator acceleration energy cost |
 | `energy_prey_acceleration_cost` | 0.0 | Disabled: no separate prey acceleration energy cost |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
-| `energy_catch_efficiency_predator` | 0.5 | Share of a caught prey's energy its catcher gains |
+| `energy_catch_efficiency_predator` | 1.0 | Share of a caught prey's energy its hunters gain together (0.5 in `add_walls`) |
 | `energy_observe_others` | True | Each observed animal's slot also shows its energy fraction (4 more inputs) |
 | `predator_max_age` | 10^9 | Aquarium's own starvation clock, kept off |
 
