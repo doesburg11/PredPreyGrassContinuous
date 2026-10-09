@@ -100,18 +100,19 @@ config_env = {
     # only scale the own-energy input (energy / max).
     "energy_predator_max": 24.0,
     "energy_prey_max": 16.0,
-    # Split the original decay equally between resting and full-speed movement.
-    # Total at speed 5 equals the original rate (predator 0.15/8, prey 0.05/8).
     # Resting metabolic cost: lost every physics step, even when stopped.
-    "energy_predator_resting_metabolic_cost": 0.15 / 8 / 2,
-    "energy_prey_resting_metabolic_cost": 0.05 / 8 / 2,
-    # Per physics step: resting metabolic cost + speed_cost * speed, linear in
-    # speed as for running animals (Taylor, Heglund & Maloiy 1982; README).
-    # Actual speed is in arena units. Acceleration has NO separate energy cost.
-    # Full speed adds the other half of the original decay.
-    "energy_predator_speed_cost": 0.15 / 8 / (2 * 5),
-    "energy_prey_speed_cost": 0.05 / 8 / (2 * 5),
-    # Keep these zero for the initial resting + speed experiment.
+    # With the speed costs at 0 (default) this is the whole, fixed cost, as in
+    # add_reproduction: moving and standing still cost the same.
+    "energy_predator_resting_metabolic_cost": 0.15 / 8,
+    "energy_prey_resting_metabolic_cost": 0.05 / 8,
+    # Optional cost linear in actual speed (arena units per step), as for
+    # running animals (Taylor, Heglund & Maloiy 1982; README). Off by default:
+    # it let predators wait cheaply and turned the balance against the prey
+    # (RESULTS.md, runs P and Q). Runs N to P used resting 0.15 / 8 / 2 and
+    # 0.05 / 8 / 2 with speed costs 0.15 / 8 / (2 * 5) and 0.05 / 8 / (2 * 5).
+    "energy_predator_speed_cost": 0.0,
+    "energy_prey_speed_cost": 0.0,
+    # Optional cost per squared change in velocity; off.
     # Acceleration/braking limits still apply to movement physics.
     "energy_predator_acceleration_cost": 0.0,
     "energy_prey_acceleration_cost": 0.0,

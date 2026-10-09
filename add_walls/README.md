@@ -5,12 +5,11 @@ block movement and sight, so prey can hide from predators and predators can
 ambush prey, as in PredPreyGrass's `walls_occlusion` experiments (see
 [Walls](#walls) below). Walls are set with `walls_layout` in
 `config/config_env.py` (default `"blocks"`). It also adds actions at full
-speed, half speed or stopped, with an energy cost linear in speed (see
-[Direction and target speed](#direction-and-target-speed)). It behaves
-like `add_reproduction` with `walls_layout = None`,
-`target_speed_actions = False`, the speed and acceleration costs at 0 and
-the resting metabolic costs at `add_reproduction`'s decay (0.15 / 8 and
-0.05 / 8). The training runs
+speed, half speed or stopped, and an optional energy cost linear in speed
+(off by default; see
+[Direction and target speed](#direction-and-target-speed)). With
+`walls_layout = None` and `target_speed_actions = False` it behaves like
+`add_reproduction`. The training runs
 and their results are logged in [RESULTS.md](RESULTS.md).
 
 This module also computes observations once per decision instead of after
@@ -38,12 +37,13 @@ reference sections.
 | Wall geometry validation | Nonfinite coordinates and sizes, undersized walls, and rectangles larger than the arena are rejected; origins are normalized so collisions, sight, sensing and rendering use the same geometry |
 | Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
 | Direction and target speed | New configurations enable 16 directions at full, half or stopped speed; acceleration and braking remain controlled by physics |
-| Movement energy costs | Resting metabolic cost plus a cost linear in actual speed each physics step; acceleration energy costs are explicitly zero for the initial experiment; speed is measured after wall resolution |
+| Movement energy costs | Optional cost linear in actual speed on top of the resting metabolic cost (off by default, so the cost per step is fixed as in `add_reproduction`); an optional acceleration cost, also off; speed is measured after wall resolution |
 | Occluded view cones | The viewer clips each view cone at the walls, so the drawn cone shows what an animal can see; one predator and one prey are followed, switching when it dies |
 | Regression coverage | Tests cover wall geometry, wrapping, visibility, open-space placement, target speeds, braking, movement costs, newborn action spaces and PPO's expanded action outputs |
 
 Walls default to the `"blocks"` layout (`walls_layout = None` switches them off). Target-speed controls
-and movement costs are enabled in the current configuration; they exist only
+are enabled in the current configuration, movement costs are available but
+off by default; both exist only
 in `add_walls` (`add_reproduction` keeps its 16 full-speed actions). Older
 checkpoint configurations keep their original 16-action controls and fixed
 resting metabolic cost.
@@ -184,10 +184,10 @@ Grass below).
 | `energy_prey_initial` | 3.0 | Prey energy at reset and at birth |
 | `energy_predator_max` | 24.0 | Predator energy cap |
 | `energy_prey_max` | 16.0 | Prey energy cap |
-| `energy_predator_resting_metabolic_cost` | 0.15 / 8 / 2 | Predator resting metabolic cost: energy lost every physics step, even when stopped |
-| `energy_prey_resting_metabolic_cost` | 0.05 / 8 / 2 | Prey resting metabolic cost: energy lost every physics step, even when stopped |
-| `energy_predator_speed_cost` | 0.15 / 8 / (2 * 5) | Predator coefficient multiplying actual speed |
-| `energy_prey_speed_cost` | 0.05 / 8 / (2 * 5) | Prey coefficient multiplying actual speed |
+| `energy_predator_resting_metabolic_cost` | 0.15 / 8 | Predator resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_prey_resting_metabolic_cost` | 0.05 / 8 | Prey resting metabolic cost: energy lost every physics step, even when stopped |
+| `energy_predator_speed_cost` | 0.0 | Predator coefficient multiplying actual speed (off) |
+| `energy_prey_speed_cost` | 0.0 | Prey coefficient multiplying actual speed (off) |
 | `energy_predator_acceleration_cost` | 0.0 | Disabled: no separate predator acceleration energy cost |
 | `energy_prey_acceleration_cost` | 0.0 | Disabled: no separate prey acceleration energy cost |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
@@ -198,14 +198,13 @@ These use PredPreyGrass's energy units, with its per-step rates divided by 8,
 because crossing this arena takes about 8 times as many steps as crossing
 its grid. PredPreyGrass has no energy cap. Here the caps are set at twice the
 reproduction thresholds, so they rarely bind and mainly scale each agent's
-own-energy input (energy / max). With the resting metabolic cost alone and no food, a
-predator starves after 534 steps and a prey after 960 steps. At steady full
-speed (5 units per step), total loss matches the original decay: predators
-starve after 267 steps and prey after 480 steps without food.
+own-energy input (energy / max). Without food, a predator starves after 267
+steps and a prey after 480 steps, moving or not (with the default speed
+costs of 0).
 
 Each step, catching predators gain catch_efficiency_predator times the prey's energy,
 prey gain energy per grass patch eaten, and every animal loses its resting
-metabolic cost plus the configured speed cost; acceleration energy costs are zero (see
+metabolic cost plus any configured speed cost (0 by default; see
 [Direction and target speed](#direction-and-target-speed)).
 Animals at or below zero energy starve: they are removed and terminated, with
 `infos[agent]["starved"] = True`. Reproduction follows. The episode ends once
@@ -474,8 +473,7 @@ separately. Existing scripted direction policies continue to request full speed.
 Random evaluation samples all 48 actions, and PPO learns a categorical policy
 over all direction/speed combinations.
 
-For the initial experiment, energy loss is charged after movement on every
-physics step using **resting cost and speed only**:
+Energy loss is charged after movement on every physics step:
 
 ```text
 energy loss = resting cost + speed cost × actual speed
@@ -484,8 +482,12 @@ energy loss = resting cost + speed cost × actual speed
 Resting costs are `energy_predator_resting_metabolic_cost` and
 `energy_prey_resting_metabolic_cost`; speed coefficients are
 `energy_predator_speed_cost` and `energy_prey_speed_cost`.
-Both `energy_predator_acceleration_cost` and `energy_prey_acceleration_cost`
-are explicitly **0.0**. Acceleration, braking, turns and collision-induced
+**By default both speed costs are 0**, so the loss per step is the fixed
+resting cost, as in `add_reproduction`: run Q showed that the
+speed-dependent cost turned the balance against the prey, because it let
+predators wait cheaply and stop starving (see [RESULTS.md](RESULTS.md),
+sections 11 and 12). Both `energy_predator_acceleration_cost` and
+`energy_prey_acceleration_cost` are also **0.0**. Acceleration, braking, turns and collision-induced
 velocity changes have no separate energy charge. Acceleration and braking
 limits still govern movement and thereby affect actual speed.
 
@@ -493,10 +495,12 @@ The implementation retains an optional acceleration-cost term for future
 experiments, but its zero coefficients remove it from the current equation.
 In `add_walls`, speed is measured after wall collision resolution, so a
 stationary animal pushing against a wall pays no travelling cost. Repeated
-decisions pay separately for each physics step. The calibration splits the
-original decay equally between resting and movement at speed 5, preserving
-the original total at full speed. With acceleration energy costs zero, the
-total is `original_decay * (0.5 + 0.5 * actual_speed / 5)`.
+decisions pay separately for each physics step. Runs N to P used a
+calibration that splits the original decay equally between resting and
+movement at speed 5, preserving the original total at full speed (resting
+costs 0.15 / 8 / 2 and 0.05 / 8 / 2, speed costs 0.15 / 8 / (2 * 5) and
+0.05 / 8 / (2 * 5)). With acceleration energy costs zero, the total is
+then `original_decay * (0.5 + 0.5 * actual_speed / 5)`:
 
 | Actual speed | Predator loss / physics step | Prey loss / physics step | Share of original decay |
 |---|---:|---:|---:|
