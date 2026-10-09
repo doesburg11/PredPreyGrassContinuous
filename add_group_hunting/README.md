@@ -3,8 +3,11 @@
 A contained copy of [`add_walls`](../add_walls/), the starting point for
 **group hunting**: catches that need, or are easier with, several predators,
 so that coordination becomes a skill predators can keep refining. Group
-hunting itself is not implemented yet; until it is, this module behaves
-exactly like `add_walls`, described below, except that walls are off by
+hunting itself is not implemented yet. The first step is done: every
+observed animal also shows its energy (`energy_observe_others`, see
+[Observations and display](#observations-and-display)), so predators can
+judge how strong a prey is. Otherwise this module behaves exactly like
+`add_walls`, described below, except that walls are off by
 default (`walls_layout = None`): the baseline is `add_walls` run T (speed
 actions, fixed energy cost, no walls), the healthiest ecosystem so far, in
 which predators stop improving early.
@@ -41,7 +44,7 @@ reference sections.
 | Wall layouts | Built-in `blocks` and `chambers`, plus custom `(x, y, width, height)` rectangles; walls wrap across arena edges |
 | Wall collisions | Animals are pushed out of obstacles and lose velocity into a wall while retaining movement along it; newborns are also moved clear of walls |
 | Sight occlusion | Walls hide animals and grass using a precomputed visibility table |
-| Wall sensing | `walls_rays` distance inputs are appended to each agent's observations; eight rays increase the default observation size from 33 to 41 |
+| Wall sensing | `walls_rays` distance inputs are appended to each agent's observations; eight rays add 8 inputs to the observation |
 | Observation computation | Observations are computed once per repeated decision, including the updated state after wall collision resolution |
 | Wall geometry validation | Nonfinite coordinates and sizes, undersized walls, and rectangles larger than the arena are rejected; origins are normalized so collisions, sight, sensing and rendering use the same geometry |
 | Wall-aware grass placement | Cluster centres skip blocked cells; patch placement and dispersal use open-space fallbacks; collapsed clusters retain their seed bank when destination cells are blocked |
@@ -201,6 +204,7 @@ Grass below).
 | `energy_prey_acceleration_cost` | 0.0 | Disabled: no separate prey acceleration energy cost |
 | `energy_grass_gain` | 2.0 | Prey energy per grass patch eaten |
 | `energy_catch_efficiency_predator` | 0.5 | Share of a caught prey's energy its catcher gains |
+| `energy_observe_others` | True | Each observed animal's slot also shows its energy fraction (4 more inputs) |
 | `predator_max_age` | 10^9 | Aquarium's own starvation clock, kept off |
 
 These use PredPreyGrass's energy units, with its per-step rates divided by 8,
@@ -424,9 +428,14 @@ be trained from scratch.
 Agents observe the egocentric layout from `dying_prey` (28 values). Prey
 also observe the nearest visible grass patch (4 values), and so do predators
 with `grass_predators_observe` (on in `config_env.py`). Every agent observes
-its own energy as a fraction of its cap (1 value). Both species therefore have
-33 inputs, before observation stacking, plus `walls_rays` wall-distance
-inputs (8) when walls are on. Runs trained before
+its own energy as a fraction of its cap (1 value). With
+`energy_observe_others` (on by default in this module), each of the 4 animal
+slots (1 predator, 3 prey) also holds that animal's energy as a fraction of
+its species' cap, so predators can judge how strong a prey is and prey how
+hungry a predator is; an empty slot holds 0. Both species therefore have 37
+inputs (33 without `energy_observe_others`, as in `add_walls`), before
+observation stacking, plus `walls_rays` wall-distance inputs (8) when walls
+are on. Checkpoints trained with 33 inputs cannot be loaded with 37. Runs trained before
 `grass_predators_observe` existed have 29 predator inputs, and their
 checkpoints keep that layout, because a missing setting means off.
 Checkpoints from earlier modules cannot be used here, because their rewards

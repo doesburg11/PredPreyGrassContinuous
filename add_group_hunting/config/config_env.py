@@ -121,6 +121,11 @@ config_env = {
     "energy_grass_gain": 2.0,  # A full PPG grass patch (regrowth 2.0 / 0.04 x 8 = 400).
     # Share of a caught prey's energy the catching predator gains (PPG: 1.0).
     "energy_catch_efficiency_predator": 0.5,
+    # Every observed animal also shows its energy (as a fraction of its
+    # species' maximum), so predators can judge how strong a prey is and prey
+    # how hungry a predator is: one more input per animal slot. False keeps
+    # add_walls' observations, in which only an agent's own energy is seen.
+    "energy_observe_others": True,
     # Aquarium's own predator starvation clock (death after this many steps
     # without a catch). Kept off so energy is the only way to starve.
     "predator_max_age": 10**9,

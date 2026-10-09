@@ -39,6 +39,7 @@ class EnergyLayer:
         prey_acceleration_cost=0.0,
         grass_gain=2.0,
         catch_efficiency_predator=1.0,
+        observe_others=False,
     ):
         settings = {
             "predator_initial": (predator_initial, True),
@@ -71,6 +72,8 @@ class EnergyLayer:
                 raise ValueError(
                     f"energy_{species}_initial must not exceed energy_{species}_max"
                 )
+        if type(observe_others) is not bool:
+            raise ValueError("energy_observe_others must be True or False")
         if catch_efficiency_predator > 1:
             raise ValueError("energy_catch_efficiency_predator must be in [0, 1]")
         self.initial = {"predator": predator_initial, "prey": prey_initial}
@@ -86,6 +89,7 @@ class EnergyLayer:
         }
         self.grass_gain = grass_gain
         self.catch_efficiency_predator = catch_efficiency_predator
+        self.observe_others = observe_others
 
     def energy(self, entity):
         return getattr(entity, "energy", self.initial[species_of(entity)])
@@ -108,7 +112,9 @@ def patch_energy(raw_env, **settings):
     at or below zero energy starve: they are removed like a caught prey and
     terminated. The episode ends once no predator or no prey is left. Every
     agent observes one more input, its own energy as a fraction of its
-    species' maximum.
+    species' maximum. With observe_others, every animal slot of the
+    egocentric observation also shows that animal's energy fraction (one
+    more input per slot; empty slots show 0).
 
     Requires keep_prey_count_constant=False: a respawned prey would need a
     separate rule for its energy, and starvation needs permanent death.
@@ -123,12 +129,20 @@ def patch_energy(raw_env, **settings):
     original_space = raw_env.observation_space
     original_update_prey = raw_env.update_prey
     original_render = raw_env.render
+    extra = 1  # own energy
+    if layer.observe_others:
+        if not getattr(raw_env, "_egocentric_obs_patched", False):
+            raise ValueError("energy_observe_others needs obs_mode='egocentric'")
+        extra += raw_env.predator_observe_count + raw_env.prey_observe_count
+        raw_env._ego_slot_energy = lambda animal: float(
+            np.clip(layer.fraction(animal), 0.0, 1.0)
+        )
     spaces = {}
     for species, agent in (("predator", "predator_0"), ("prey", "prey_0")):
-        size = original_space(agent).shape[0] + 1
+        size = original_space(agent).shape[0] + extra
         spaces[species] = Box(-1.0, 1.0, shape=(size,), dtype=np.float32)
-    raw_env.number_of_predator_observations += 1
-    raw_env.number_of_fish_observations += 1
+    raw_env.number_of_predator_observations += extra
+    raw_env.number_of_fish_observations += extra
     catches = []  # (catching predator, prey energy) this step
 
     def get_obs():

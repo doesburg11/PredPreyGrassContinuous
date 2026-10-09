@@ -316,6 +316,10 @@ def _patch_egocentric_obs(raw_env) -> int:
         return dx, dy
 
     def slots(observer, animals, count, view_distance, fov):
+        # patch_energy sets this when every slot also shows the animal's
+        # energy (energy_observe_others), making each slot one value longer.
+        energy_of = getattr(raw_env, "_ego_slot_energy", None)
+        slot_size = _EGO_SLOT_SIZE + (energy_of is not None)
         seen = []
         for animal in animals:
             if animal is observer:
@@ -337,7 +341,9 @@ def _patch_egocentric_obs(raw_env) -> int:
                 animal.velocity.x / animal.max_speed,
                 animal.velocity.y / animal.max_speed,
             ]
-        return values + [0.0] * (_EGO_SLOT_SIZE * count - len(values))
+            if energy_of is not None:
+                values.append(energy_of(animal))
+        return values + [0.0] * (slot_size * count - len(values))
 
     def observe(observer, view_distance, fov):
         heading = math.radians(observer.orientation_angle)
@@ -768,6 +774,7 @@ def make_env(env_config: dict) -> SafeParallelPettingZooEnv:
         "energy_prey_acceleration_cost",
         "energy_grass_gain",
         "energy_catch_efficiency_predator",
+        "energy_observe_others",
     )
     energy_config = None
     if any(key in env_config for key in energy_keys):

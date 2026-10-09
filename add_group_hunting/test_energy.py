@@ -1,5 +1,7 @@
 """Metabolic costs, food, catches, starvation, observations, and rendering."""
 
+import math
+
 import numpy as np
 import pytest
 from marl_aquarium.env.vector import Vector
@@ -57,6 +59,7 @@ def idle(env, obs):
         {"catch_efficiency_predator": 1.5},
         {"prey_initial": 150, "prey_max": 100},
         {"predator_max": True},
+        {"observe_others": 1},
     ],
 )
 def test_invalid_energy_settings(settings):
@@ -88,6 +91,83 @@ def test_observations_end_with_own_energy_fraction(env):
     assert infos["prey_1"]["energy"] == pytest.approx(49.5)
     for agent, value in obs.items():
         assert env.observation_space[agent].contains(value)
+
+
+def test_observe_others_adds_each_seen_animals_energy():
+    env = make_env(
+        {**BASE, "energy_observe_others": True, "predator_fov": 360, "prey_fov": 360}
+    )
+    try:
+        _, raw = setup(env)
+        predator = raw.predators[0]
+        near, far = raw.prey
+        predator.position = Vector(400, 400)
+        near.position = Vector(460, 400)
+        far.position = Vector(400, 470)
+        predator.energy, near.energy, far.energy = 150.0, 30.0, 80.0
+        obs = raw.get_obs()
+        # One more input per animal slot (1 predator + 3 prey slots).
+        assert env.observation_space["predator_0"].shape == (29 + 4,)
+        assert env.observation_space["prey_0"].shape == (33 + 4,)
+        o = obs["predator_0"]
+        # Own 4, then a 7-value predator slot (empty: no other predator), then
+        # prey slots nearest first, each ending in that prey's energy fraction.
+        assert not o[4:11].any()
+        assert o[11] == 1 and o[17] == pytest.approx(30 / 100)
+        assert o[18] == 1 and o[24] == pytest.approx(80 / 100)
+        assert not o[25:32].any()  # third prey slot empty
+        assert o[-1] == pytest.approx(150 / 200)  # own energy, as before
+        p = obs[near.id()]
+        assert p[4] == 1 and p[10] == pytest.approx(150 / 200)  # the predator
+        assert p[11] == 1 and p[17] == pytest.approx(80 / 100)  # the other prey
+        for agent, value in obs.items():
+            assert env.observation_space[agent].contains(value)
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize("action_repeat", [1, 3])
+def test_observed_energies_are_current_after_a_step(action_repeat):
+    env = make_env(
+        {
+            **BASE,
+            "energy_observe_others": True,
+            "predator_fov": 360,
+            "prey_fov": 360,
+            "action_repeat": action_repeat,
+        }
+    )
+    try:
+        _, raw = setup(env)
+        predator = raw.predators[0]
+        near, far = raw.prey
+        predator.position = Vector(400, 400)
+        near.position = Vector(460, 400)
+        far.position = Vector(400, 470)
+        obs, _, _, _, _ = env.step({agent: 0 for agent in env.agents})
+        o = obs["predator_0"]
+        # Prey slots are nearest first; each shows that prey's current energy,
+        # after this decision's resting costs.
+        slots = sorted(
+            raw.prey,
+            key=lambda prey: math.hypot(
+                prey.position.x - predator.position.x,
+                prey.position.y - predator.position.y,
+            ),
+        )
+        for index, prey in enumerate(slots):
+            assert o[11 + 7 * index] == 1
+            assert o[17 + 7 * index] == pytest.approx(prey.energy / 100, abs=1e-6)
+        assert prey.energy < 50.0
+        for agent, value in obs.items():
+            assert env.observation_space[agent].contains(value)
+    finally:
+        env.close()
+
+
+def test_observe_others_needs_egocentric_observations():
+    with pytest.raises(ValueError, match="egocentric"):
+        make_env({**BASE, "obs_mode": "aquarium", "energy_observe_others": True})
 
 
 def test_grass_feeds_prey_up_to_max(env):

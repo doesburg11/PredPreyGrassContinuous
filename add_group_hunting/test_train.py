@@ -257,7 +257,11 @@ def test_make_env_fills_in_required_obs_mode_and_permanent_deaths():
         assert raw.keep_prey_count_constant is False
         assert raw._egocentric_obs_patched
         wall_inputs = env_config["walls_rays"] if env_config["walls_layout"] else 0
-        assert env.get_observation_space("prey_0").shape == (33 + wall_inputs,)
+        # One energy input per animal slot (1 predator + 3 prey slots).
+        energy_inputs = 4 if env_config["energy_observe_others"] else 0
+        assert env.get_observation_space("prey_0").shape == (
+            33 + wall_inputs + energy_inputs,
+        )
     finally:
         env.close()
 
