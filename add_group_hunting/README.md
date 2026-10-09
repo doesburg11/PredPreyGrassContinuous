@@ -11,6 +11,18 @@ judge how strong a prey is. Walls are off by default
 `add_walls` run T (speed actions, fixed energy cost, no walls), the
 healthiest ecosystem so far, in which predators stop improving early.
 
+## Seeing other animals' energy
+
+In `add_walls`, an agent observes its own energy but not that of the animals
+it sees. With `energy_observe_others` (on by default here), each of the 4
+animal slots in the observation (1 predator, 3 prey) also holds that
+animal's energy as a fraction of its species' cap; an empty slot holds 0.
+Predators can then judge how strong a prey is, which group hunting needs,
+and prey how hungry a predator is. Observations grow from 33 to 37 inputs,
+so checkpoints with 33 inputs (all `add_walls` runs) cannot be loaded. The
+energy shown is the animal's current energy after the latest physics step.
+Details in [Observations and display](#observations-and-display).
+
 ## Group hunting
 
 When a predator touches a prey, it attacks. The attack succeeds with
@@ -66,6 +78,21 @@ Group hunting is on when any of these settings is present; it needs the
 energy settings. Each environment counts attacks, failed attacks and
 catches by number of hunters in `raw_env.group_hunting.stats` (reset every
 episode). Hunters are counted regardless of walls.
+
+Code: `group_hunting.py` wraps Aquarium's `update_prey` as the outermost
+layer. On a successful attack it passes Aquarium only the catcher, so the
+prey dies as usual; otherwise it passes no touching predator, so the prey
+lives. It records the hunters, and `energy.py` splits the prey's energy
+among them. Tests: `test_group_hunting.py`; the energy inputs are tested in
+`test_energy.py`.
+
+## Training runs
+
+`add_group_hunting/runs/` holds the first two runs, both from scratch for
+1,000 iterations: a baseline with energy visible but no group hunting
+(catch efficiency 0.5, `2026-10-09_19-40-02_971713`), and the default
+settings above (`2026-10-09_20-24-36_412858`). Their results will be logged
+in a RESULTS.md here, continuing the [add_walls log](../add_walls/RESULTS.md).
 
 ## Inherited from add_walls
 
@@ -267,13 +294,15 @@ Grass below).
 These use PredPreyGrass's energy units, with its per-step rates divided by 8,
 because crossing this arena takes about 8 times as many steps as crossing
 its grid. PredPreyGrass has no energy cap. Here the caps are set at twice the
-reproduction thresholds, so they rarely bind and mainly scale each agent's
-own-energy input (energy / max). Without food, a predator starves after 267
+reproduction thresholds, so they rarely bind and mainly scale the energy
+inputs (energy / max), an agent's own and, with `energy_observe_others`,
+those of the animals it sees. Without food, a predator starves after 267
 steps and a prey after 480 steps, moving or not (with the default speed
 costs of 0).
 
-Each step, catching predators gain catch_efficiency_predator times the prey's energy,
-prey gain energy per grass patch eaten, and every animal loses its resting
+Each step, the hunters of each catch share catch_efficiency_predator times
+the prey's energy equally (a lone catcher gets all of it; see
+[Group hunting](#group-hunting)), prey gain energy per grass patch eaten, and every animal loses its resting
 metabolic cost plus any configured speed cost (0 by default; see
 [Direction and target speed](#direction-and-target-speed)).
 Animals at or below zero energy starve: they are removed and terminated, with
