@@ -91,8 +91,9 @@ among them. Tests: `test_group_hunting.py`; the energy inputs are tested in
 `add_group_hunting/runs/` holds the first two runs, both from scratch for
 1,000 iterations: a baseline with energy visible but no group hunting
 (catch efficiency 0.5, `2026-10-09_19-40-02_971713`), and the default
-settings above (`2026-10-09_20-24-36_412858`). Their results will be logged
-in a RESULTS.md here, continuing the [add_walls log](../add_walls/RESULTS.md).
+settings above (`2026-10-09_20-24-36_412858`). Their results are logged in
+[RESULTS.md](RESULTS.md), continuing the [add_walls log](../add_walls/RESULTS.md);
+the analysis scripts it uses are in `analysis/`.
 
 ## Inherited from add_walls
 

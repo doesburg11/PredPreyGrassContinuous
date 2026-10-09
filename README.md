@@ -40,7 +40,8 @@ trained with RLlib's new API stack (RLModule + Learner).
   group hunting: a catch is a contest between the summed energy of nearby
   predators and the prey's energy, and is shared among the hunters; every
   observed animal shows its energy. See its
-  [README](add_group_hunting/README.md).
+  [README](add_group_hunting/README.md), and its
+  [RESULTS](add_group_hunting/RESULTS.md) for its training runs.
 
 ## Grass: from static patches to moving clusters
 
