@@ -20,10 +20,11 @@ are as defined in the add_reproduction log.
 | P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | completed |
 | Q | `2026-10-08_22-52-21_564755` | scratch | 1,000 | as P, with run L's fixed energy cost (control) | completed |
 | R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
+| S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
-defaults of commit `441cae8`.
+defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S).
 
 ## Settings compared with run L
 
@@ -258,6 +259,49 @@ slightly (N against P). Run R lands at run L's level at the same stage
 in half the episodes after 3,000 more iterations (run M), so run R is the
 first walls world that is not clearly behind that path.
 
+## 14. Walls with the fixed energy cost, continued (run S)
+
+Run S continued run R for 2,000 iterations (about 4.5 hours), so 3,000 in
+total. Per episode, in blocks of 250 iterations, numbered as one training:
+
+| Iterations | Run | Predator births | Prey births | Episode length (decisions) | Run O | Run M |
+|---|---|---:|---:|---:|---:|---:|
+| 751–1000 | R | 7.6 | 56 | 158 | 107 | — |
+| 1001–1250 | S | 8.3 | 64 | 183 | 105 | 227 (1001–1500) |
+| 1251–1500 | S | 8.7 | 69 | 201 | 104 | |
+| 1501–1750 | S | 9.5 | 78 | 235 | 106 | 410 (1501–2000) |
+| 1751–2000 | S | 10.4 | 90 | 275 | 112 | |
+| 2001–2250 | S | 10.8 | 97 | 302 | 127 | 503 (2001–2500) |
+| 2251–2500 | S | 11.6 | 109 | 346 | 138 | |
+| 2501–2750 | S | 10.4 | 95 | 293 | 134 | 590 (2501–3000) |
+| 2751–3000 | S | 11.3 | 105 | 330 | 146 | |
+
+Episodes doubled in length over iterations 1,000–2,500, then levelled off
+at about 300–350 decisions; run M was still growing at that stage.
+
+**Final check, run S** (`final_check.csv`, iteration 2,990): **1 of 20
+coexisting**, prey extinct in 19. Averages per episode: length 1,363
+physics steps (run R: 942, run O: 752), catch risk 5.62 (run R: 7.82, run
+O: 8.13), 75 prey caught and 68 born, 6.6 predators starved.
+
+**Tournament over runs R and S** (checkpoints every 300 iterations, 10
+episodes per matchup; `tournament_combined.csv` in run S): prey died out in
+953 of 1,000 episodes, predators in 26, both survived in 21. Newer prey are
+harder to catch in **83%** of pairs, newer predators catch more in **60%**;
+in the second half (iterations 1,800–2,990) 66% and 56%.
+
+| Checkpoint | 300 | 600 | 900 | 1200 | 1500 | 1800 | 2100 | 2400 | 2700 | 2990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 6.0 | 6.3 | 6.8 | 7.1 | 7.3 | 6.9 | 6.6 | 7.1 | 7.5 | 6.9 |
+| Prey: catch risk averaged over all predators | 9.5 | 8.5 | 7.7 | 7.3 | 7.3 | 6.4 | 5.4 | 5.4 | 5.9 | 5.2 |
+
+**Conclusion:** with the fixed cost, prey among walls do improve: catch
+risk falls from 9.5 to about 5.2 over 3,000 iterations (run O: 10.0 to
+8.0), and the first walls episodes with both species alive appear. They
+improve more slowly than run M's prey without walls (catch risk about 3
+after 4,000 iterations, 10 of 20 coexisting), and predators gain little
+after iteration 1,500, so there is no sustained arms race either.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -271,7 +315,8 @@ first walls world that is not clearly behind that path.
    starve again. Cheap waiting mainly helps the predators.
 4. **With the fixed cost, walls favour the predators** (run R against Q):
    catch risk 7.8 against 4.8, the same as run L without walls or speed
-   actions.
+   actions. Continued to 3,000 iterations (run S), prey reach catch risk 5.2
+   and 1 of 20 coexisting, more slowly than run M's prey without walls.
 5. **Both species keep improving in this world** (81% and 67% of tournament
    pairs; run P: 79% and 69%), the closest to co-adaptation so far, though
    predators improve much more slowly after the first few hundred
