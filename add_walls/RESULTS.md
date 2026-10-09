@@ -21,10 +21,12 @@ are as defined in the add_reproduction log.
 | Q | `2026-10-08_22-52-21_564755` | scratch | 1,000 | as P, with run L's fixed energy cost (control) | completed |
 | R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
 | S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
+| T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
-defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S).
+defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
+`runs/continue_fixed_cost_control.py` (T).
 
 ## Settings compared with run L
 
@@ -302,6 +304,61 @@ improve more slowly than run M's prey without walls (catch risk about 3
 after 4,000 iterations, 10 of 20 coexisting), and predators gain little
 after iteration 1,500, so there is no sustained arms race either.
 
+## 15. Speed actions with the fixed cost, no walls, continued (run T)
+
+Run T continued run Q for 2,000 iterations (about 5 hours), so 3,000 in
+total: the same world as runs R and S, without walls. Per episode, in blocks
+of 250 iterations, numbered as one training:
+
+| Iterations | Run | Predator births | Prey births | Episode length (decisions) | Run S (walls) |
+|---|---|---:|---:|---:|---:|
+| 751–1000 | Q | 14.6 | 123 | 340 | 158 |
+| 1001–1250 | T | 19.2 | 175 | 480 | 183 |
+| 1251–1500 | T | 20.9 | 193 | 529 | 201 |
+| 1501–1750 | T | 22.1 | 209 | 571 | 235 |
+| 1751–2000 | T | 23.6 | 223 | 606 | 275 |
+| 2001–2250 | T | 26.5 | 260 | 706 | 302 |
+| 2251–2500 | T | 26.9 | 268 | 729 | 346 |
+| 2501–2750 | T | 29.0 | 295 | 802 | 293 |
+| 2751–3000 | T | 31.8 | 342 | 921 | 330 |
+
+Run M, for comparison: 227, 410, 503 and 590 decisions over iterations
+1001–1500, 1501–2000, 2001–2500 and 2501–3000.
+
+**Final checks after 3,000 iterations** (20 episodes each):
+
+| Run | Walls | Coexisting | Prey extinct | Predators extinct | Length (physics steps) | Catch risk | Predators starved |
+|---|---|---:|---:|---:|---:|---:|---:|
+| O | yes (speed-dependent cost) | 0 | 20 | 0 | 752 | 8.13 | — |
+| S | yes | 1 | 19 | 0 | 1,363 | 5.62 | 6.6 |
+| **T** | no | **11** | 7 | 2 | **5,885** | **3.02** | 32.0 |
+| M (4,000 iterations) | no (16 actions) | 10 | 10 | 0 | 5,724 | 2.93 | 6.3 |
+
+Run T per episode: 313 prey caught, 341 born, 22.6 starved; 6.5 predators
+and 17.0 prey alive on average.
+
+**Tournament over runs Q and T** (checkpoints every 300 iterations, 10
+episodes per matchup; `tournament_combined.csv` in run T): both species
+survived in 185 of 1,000 episodes, prey died out in 757, predators in 58.
+Newer prey are harder to catch in **89%** of pairs, newer predators catch
+more in **55%**; in the second half (iterations 1,800–2,990) 76% and 34%.
+Coexistence rises with the prey checkpoint (0% with prey 300, 39% with prey
+2,990) and hardly depends on the predator checkpoint after iteration 600
+(10–25%).
+
+| Checkpoint | 300 | 600 | 900 | 1200 | 1500 | 1800 | 2100 | 2400 | 2700 | 2990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 4.2 | 4.7 | 4.7 | 4.7 | 4.6 | 5.1 | 4.8 | 4.9 | 4.6 | 4.3 |
+| Prey: catch risk averaged over all predators | 6.7 | 5.9 | 5.8 | 4.9 | 4.4 | 4.8 | 3.9 | 3.6 | 3.4 | 3.0 |
+
+**Conclusion:** without walls, the speed actions with the fixed cost give
+the healthiest ecosystem so far: 11 of 20 coexisting after 3,000
+iterations, where run M needed 4,000 for 10 of 20, and episodes still
+growing at the end of training. The walls are what holds run S back: with
+them, the same world reaches 1 of 20. The pattern of runs E to M is back,
+though: prey keep improving and predators stop after a few hundred
+iterations (55% of pairs overall, 34% late), so there is still no arms race.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -317,7 +374,10 @@ after iteration 1,500, so there is no sustained arms race either.
    catch risk 7.8 against 4.8, the same as run L without walls or speed
    actions. Continued to 3,000 iterations (run S), prey reach catch risk 5.2
    and 1 of 20 coexisting, more slowly than run M's prey without walls.
-5. **Both species keep improving in this world** (81% and 67% of tournament
+5. **Without walls, speed actions with the fixed cost give the healthiest
+   ecosystem so far** (run T): 11 of 20 coexisting after 3,000 iterations.
+   Predators again stop improving early, so there is no arms race.
+6. **Both species keep improving in this world** (81% and 67% of tournament
    pairs; run P: 79% and 69%), the closest to co-adaptation so far, though
    predators improve much more slowly after the first few hundred
    iterations.
