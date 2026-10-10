@@ -12,7 +12,8 @@ config_eval = {
     # A run's checkpoint/ directory (its final model) or one of its
     # checkpoint/iter_<n> directories. Only for "checkpoint".
     # Set to a run's checkpoint/ (or checkpoint/iter_<n>) once one exists.
-    "checkpoint": str(RUNS_DIR / "add_walls_2026-10-08_11-27-42_148248" / "checkpoint"),
+    # Run S: walls, speed actions, fixed energy cost, 3,000 iterations in total.
+    "checkpoint": str(RUNS_DIR / "add_walls_2026-10-09_09-28-39_319209" / "checkpoint"),
     "model_seed": 0,  # Which recommended model (0, 1 or 2). Only for "recommended".
     "episodes": 1,
     "seed": 0,  # Seed of the first episode; episode k uses seed + k - 1.

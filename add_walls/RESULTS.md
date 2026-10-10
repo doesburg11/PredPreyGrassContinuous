@@ -377,7 +377,8 @@ iterations (55% of pairs overall, 34% late), so there is still no arms race.
 5. **Without walls, speed actions with the fixed cost give the healthiest
    ecosystem so far** (run T): 11 of 20 coexisting after 3,000 iterations.
    Predators again stop improving early, so there is no arms race.
-6. **Both species keep improving in this world** (81% and 67% of tournament
-   pairs; run P: 79% and 69%), the closest to co-adaptation so far, though
-   predators improve much more slowly after the first few hundred
+6. **With walls and the speed-dependent cost, both species keep improving**
+   (runs N and O: 81% and 67% of tournament pairs; run P, the same without
+   walls: 79% and 69%), the highest predator share of the add_walls runs,
+   though predators improve much more slowly after the first few hundred
    iterations.
