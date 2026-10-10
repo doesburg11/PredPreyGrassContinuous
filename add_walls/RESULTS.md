@@ -22,11 +22,14 @@ are as defined in the add_reproduction log.
 | R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
 | S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
 | T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
+| Y | (queued) | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | queued |
+| Y0 | (queued) | T final | 1,000 | control for Y: T's fixed cost unchanged | queued |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
 defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
-`runs/continue_fixed_cost_control.py` (T).
+`runs/continue_fixed_cost_control.py` (T), `runs/continue_T_gentle_cost.py` (Y),
+`runs/continue_T_control.py` (Y0).
 
 ## Settings compared with run L
 
