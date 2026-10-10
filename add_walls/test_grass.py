@@ -577,3 +577,18 @@ def test_predators_observe_grass_in_their_own_view_cone():
 def test_invalid_predators_observe_setting(raw, settings):
     with pytest.raises(ValueError):
         GrassLayer(raw, **settings)
+
+
+def test_sprite_pose_mirrors_and_tilts_but_never_turns_over():
+    from grass import sprite_pose
+
+    assert sprite_pose(3.0, 0.0) == (True, 0.0)
+    assert sprite_pose(-3.0, 0.0) == (False, 0.0)
+    # Screen y points down: moving up (negative y) leans the sprite up.
+    right, tilt = sprite_pose(3.0, -3.0, max_tilt=20.0)
+    assert right and tilt == pytest.approx(20.0)  # 45 degrees, capped
+    right, tilt = sprite_pose(-4.0, 1.0, max_tilt=20.0)
+    assert not right and -20.0 < tilt < 0
+    # Straight up keeps the facing; stopping keeps the whole pose.
+    assert sprite_pose(0.0, -2.0, previous=(False, 5.0), max_tilt=10.0) == (False, 10.0)
+    assert sprite_pose(0.0, 0.0, previous=(False, -12.0)) == (False, -12.0)

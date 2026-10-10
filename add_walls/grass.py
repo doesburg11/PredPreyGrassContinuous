@@ -402,6 +402,7 @@ def ensure_view(raw_env):
         view.fish_image = sprite_for_radius(
             pygame, view.fish_image, raw_env.prey_radius
         )
+        view.draw_animal = oriented_draw_animal(pygame, view)
         if scaled:
             raw_env.window = pygame.display.set_mode(total)
             raw_env.arena_px = arena_px
@@ -425,6 +426,61 @@ def sprite_for_radius(pygame, image, radius):
     scale = target / max(image.get_size())
     size = (max(1, round(image.get_width() * scale)), round(image.get_height() * scale))
     return pygame.transform.smoothscale(image, (size[0], max(1, size[1])))
+
+
+# The sprites' own facing: the antelope (prey) looks right, the hunter
+# (predator) holds its spear to the left.
+SPRITE_FACES_RIGHT = {"predator": False, "prey": True}
+# Degrees a sprite leans up or down with its movement, at most. The
+# antelope already leaps diagonally upwards, so it leans less.
+MAX_TILT = {"predator": 20.0, "prey": 10.0}
+
+
+def sprite_pose(vx, vy, previous=(True, 0.0), max_tilt=20.0):
+    """(faces_right, tilt) for an animal moving with velocity (vx, vy) in
+    screen coordinates (y down): it faces the way it moves horizontally and
+    leans up or down by the vertical part of its movement, at most max_tilt
+    degrees, so it never turns upside down. A stopped animal keeps its
+    previous pose; straight up or down keeps the previous facing."""
+    if math.hypot(vx, vy) < 1e-6:
+        return previous
+    right = previous[0] if abs(vx) < 1e-6 else vx > 0
+    tilt = math.degrees(math.atan2(-vy, abs(vx)))
+    return right, max(-max_tilt, min(max_tilt, tilt))
+
+
+def oriented_draw_animal(pygame, view):
+    """Replace Aquarium's View.draw_animal, which draws every sprite in one
+    fixed pose, by one that mirrors the sprite to face its direction of
+    movement and tilts it by at most its species' MAX_TILT degrees. Display only."""
+    from marl_aquarium.env.predator import Predator
+
+    def draw_animal(position, animal):
+        if not animal.alive:
+            return
+        species = "predator" if isinstance(animal, Predator) else "prey"
+        image = view.shark_image if species == "predator" else view.fish_image
+        right, tilt = sprite_pose(
+            animal.velocity.x,
+            animal.velocity.y,
+            getattr(animal, "sprite_pose", (SPRITE_FACES_RIGHT[species], 0.0)),
+            MAX_TILT[species],
+        )
+        animal.sprite_pose = (right, tilt)
+        if right != SPRITE_FACES_RIGHT[species]:
+            image = pygame.transform.flip(image, True, False)
+        # pygame rotates counterclockwise: a right-facing sprite leans up with
+        # a positive angle, a left-facing one with a negative angle.
+        image = pygame.transform.rotate(image, tilt if right else -tilt)
+        view.screen.blit(
+            image,
+            (
+                position.x - image.get_width() // 2,
+                position.y - image.get_height() // 2,
+            ),
+        )
+
+    return draw_animal
 
 
 def work_area(pygame):

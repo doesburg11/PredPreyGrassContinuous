@@ -424,6 +424,10 @@ Checkpoints from earlier modules cannot be used here, because their rewards
 and populations differ.
 
 The viewer draws grass under the animals and an energy bar above each animal.
+Each animal's picture faces the way it moves (mirrored when it runs left)
+and leans up or down with its movement, by at most 20° for predators and
+10° for prey, whose picture already leaps diagonally, so it never turns
+upside down (`sprite_pose` in `grass.py`; display only).
 
 Evaluation settings live in `config/config_eval.py`: what to run
 (`source`: a training `checkpoint`, or `random` actions as a baseline), the
