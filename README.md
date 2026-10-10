@@ -1,12 +1,12 @@
 # PredPreyGrassContinuous
 
-![Predators (hunters) and prey (antelopes) among clusters of grass](assets/snapshot_no_walls.png)
+![Animation of predators (hunters) hunting prey (antelopes) that graze clusters of grass](assets/arena_no_walls.gif)
 
-*`add_walls` without walls, with the policies trained in run T (speed
-actions, fixed energy cost), the healthiest ecosystem so far: predators
-hunt prey, and prey graze two clusters of grass. The two shaded cones are
-the view of one predator (blue, 150°) and one prey (grey, 240°); both wrap
-across the arena's edges.*
+*About 240 decisions (1,900 physics steps) of `add_walls` without walls,
+with the policies trained in run T (speed actions, fixed energy cost), the
+healthiest ecosystem so far: predators hunt prey, and prey graze clusters of
+grass. The two shaded cones are the view of one predator (blue, 150°) and
+one prey (grey, 240°); both wrap across the arena's edges.*
 
 A continuous-space counterpart to the grid-based
 [PredPreyGrass](https://github.com/doesburg11/PredPreyGrass): multi-agent
