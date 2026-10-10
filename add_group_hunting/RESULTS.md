@@ -192,6 +192,51 @@ together more often than the control, so some grouping may have emerged,
 but per attack it barely pays. Group hunting has to be tested with a catch
 efficiency that keeps predators from booming.
 
+## 4. Group hunting with catch efficiency 0.5 (run W), first 1,000 iterations
+
+Run W trains for 3,000 iterations; this section evaluates its first 1,000
+while training continues (files with suffixes `_990` and `_first1000` in
+run W). Per episode, in blocks of 250 iterations:
+
+| Iterations | Predator births | Prey births | Episode length (decisions) | Run U length | Run V length |
+|---|---:|---:|---:|---:|---:|
+| 1–250 | 0.8 | 65 | 141 | 452 | 173 |
+| 251–500 | 2.4 | 91 | 208 | 237 | 127 |
+| 501–750 | 5.3 | 124 | 293 | 214 | 120 |
+| 751–1000 | 7.6 | 150 | 358 | 222 | 104 |
+
+**Final check at iteration 990** (`final_check_990.csv`, 20 episodes): the
+**predators** died out in all 20, after 2,657 physics steps on average.
+Catch risk 0.82 (run U: 7.51). Per episode: 3.8 predators and 41.3 prey
+alive on average, 15.6 predators starved, 31.9 prey starved (food, not
+predators, now limits the prey), 9.6 predator and 177 prey births.
+
+**Tournament** (checkpoints every 100 iterations, 10 episodes per matchup;
+`tournament_first1000.csv`): predators died out in 981 of 1,000 episodes,
+both survived in 18. Newer predators catch more in **92%** of pairs, newer
+prey are harder to catch in **73%**; in the second half (iterations
+600–990) **82%** and **72%**.
+
+| Checkpoint | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 0.3 | 0.4 | 0.5 | 0.5 | 0.6 | 0.6 | 0.8 | 1.0 | 0.9 | 1.0 |
+| Prey: catch risk averaged over all predators | 0.8 | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 0.7 | 0.6 | 0.6 | 0.6 |
+| Episodes with both alive, by predator checkpoint | 0% | 0% | 0% | 0% | 0% | 1% | 0% | 3% | 6% | 8% |
+
+**Group attacks** (`analysis/group_catches_W990.json`, iteration 990, 20
+episodes): 3,276 attacks, 37% successful, 4.2 predators alive on average.
+14% of attacks had a second predator within 64 units (6% if predators were
+spread at random); 21% of catches were made by two or more hunters. Success
+by hunters: alone 34%, two 51%, three or more 85%.
+
+**Interim conclusion:** with catch efficiency 0.5, group hunting reverses
+the balance: predators are now the struggling species and die out, while
+prey are limited by food. But for the first time both species keep
+improving through the second half of training (82% and 72% of pairs), the
+signature of an arms race: predator catch risk triples from 0.3 to 1.0,
+while prey become harder to catch. Predators still hunt mostly alone; with
+so few predators alive, company is rare.
+
 ## Findings so far
 
 1. **Seeing other animals' energy helps the predators** (run U against
