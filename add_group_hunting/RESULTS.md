@@ -290,9 +290,30 @@ alone 30%, two 57%, three or more 77%.
 **Conclusion:** group hunting with catch efficiency 0.5 is too hard for the
 predators to sustain. They kept dying out, and after about 1,500 iterations
 their policy degraded rather than improved, although they attacked together
-more and more often. A likely factor, not tested: with only about 4
-predators alive, predators supply few training samples per batch compared
-with about 40 prey, so their policy learns from little and noisy data.
+more and more often.
+
+**Why did the predators degrade?** (TensorBoard metrics of runs W and T.)
+Too little predator data does not explain it: predators supplied about
+18,000 samples per iteration (8% of all samples; run T: about 31,000, 30%),
+and that amount stayed the same while they improved and while they
+degraded. What did change is how random their policy is:
+
+| Iterations | Run W predator policy entropy | Run T predator policy entropy |
+|---|---:|---:|
+| 1–500 | 3.05 | 0.71 |
+| 501–1000 | 2.38 | 0.67 |
+| 1001–1500 | 2.07 | 0.63 |
+| 1501–2000 | 2.04 | 0.61 |
+| 2001–2500 | 2.26 | — |
+| 2501–3000 | 2.43 | — |
+
+(The maximum, uniformly random over 48 actions, is ln 48 = 3.87.) Run W's
+predator policy stayed far more random than run T's throughout, and became
+more random again from iteration 2,000 as its births became rarer. A
+plausible mechanism, not tested: PPO's entropy bonus (`entropy_coeff` 0.01)
+rewards randomness on every step, while the only real reward, a birth,
+became rarer as the predators got worse, so the bonus increasingly outweighed
+it and pulled the policy back towards random behaviour.
 
 ## Findings so far
 
