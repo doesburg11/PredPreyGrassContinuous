@@ -1,11 +1,12 @@
 # PredPreyGrassContinuous
 
-![Predators (hunters) and prey (antelopes) among walls and grass](assets/snapshot_add_walls.png)
+![Predators (hunters) and prey (antelopes) among clusters of grass](assets/snapshot_no_walls.png)
 
-*`add_walls` with the policies trained in run O: predators hunt prey, prey
-graze the grass, and the walls block movement and sight. The two shaded
-cones are the view of one predator (blue, 150°, wrapping across the arena's
-edge) and one prey (grey, 240°), cut off where walls block the view.*
+*`add_walls` without walls, with the policies trained in run T (speed
+actions, fixed energy cost), the healthiest ecosystem so far: predators
+hunt prey, and prey graze two clusters of grass. The two shaded cones are
+the view of one predator (blue, 150°) and one prey (grey, 240°); both wrap
+across the arena's edges.*
 
 A continuous-space counterpart to the grid-based
 [PredPreyGrass](https://github.com/doesburg11/PredPreyGrass): multi-agent
