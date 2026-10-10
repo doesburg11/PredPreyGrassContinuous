@@ -1,6 +1,8 @@
 # PredPreyGrassContinuous
 
-![Animation of predators (hunters) hunting prey (antelopes) that graze clusters of grass](assets/arena_no_walls.gif)
+<p align="center">
+  <img src="assets/arena_no_walls.gif" alt="Animation of predators (hunters) hunting prey (antelopes) that graze clusters of grass" width="480">
+</p>
 
 *About 240 decisions (1,900 physics steps) of `add_walls` without walls,
 with the policies trained in run T (speed actions, fixed energy cost), the
