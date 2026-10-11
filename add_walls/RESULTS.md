@@ -32,7 +32,8 @@ switch keep their letters; new runs get only an ID.
 | AW-10 | Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
 | AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
 | AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | completed |
-| AW-13 | | `2026-10-11_20-10-11_350322` | T final | 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | running |
+| AW-13 | | (deleted) | T final | 478 of 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | stopped, see section 20 |
+| AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | running |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -42,7 +43,7 @@ defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 `runs/continue_T_move50.py` (Z50). A 75% run (Z75) was stopped after about
 120 iterations, once Z25 and Z50 showed the trend, and deleted.
 `runs/continue_T_move25_fastprey.py` (AW-12), `runs/continue_T_move50_fastprey.py`
-(AW-13).
+(AW-13), `runs/continue_T_move75_fastprey.py` (AW-14).
 
 ## Settings compared with run L
 
@@ -599,6 +600,38 @@ predation, avoid grass more (11% of their time near it, against 24%). The
 balanced setting lies between: for example a smaller speed advantage, or
 the same advantage with a larger movement share.
 
+
+## 20. Towards a realistic movement share (runs AW-13 and AW-14)
+
+**How large is the movement share in real animals?** Taylor, Heglund and
+Maloiy (1982) fitted the energy use of running birds and mammals as
+`0.533 × M^-0.316 × v + 0.300 × M^-0.303` (ml oxygen per second per kg,
+body mass `M` in kg, speed `v` in m/s): a running cost rising linearly with
+speed plus a cost at zero speed. For a 50 kg animal, the movement part is
+about 60% of the total at 1 m/s, 83% at 3 m/s and 89% at 5 m/s. The real
+share is higher still: the zero-speed term is about 1.7 times the
+resting metabolism of a lying animal, sprints also cost anaerobic energy,
+and smaller animals pay more per kg. Running at speed costs roughly 5 to 10
+times as much as resting, a movement share of about 0.8 to 0.9 at full
+speed in this model's terms (README, "How large is the movement share in
+real animals?"). Averaged over a day, wild animals spend only 2 to 3 times
+their resting rate, because they rest and walk much of the time; that is a
+daily average, not the cost of moving.
+
+The shares tested so far (10% to 50%) are therefore well below the
+biological value, and with equal top speeds even 50% wiped out the prey
+(section 17). Since prey in nature survive such costs through advantages
+such as speed, the series moves towards realistic shares while keeping
+run AW-12's speed advantage (prey 5.5, predators 5):
+
+- **AW-13** (50% movement share) was stopped at iteration 478 to go directly
+  to 75%. Up to then it looked balanced: predator births rose from 35.9 to
+  38.2 per episode, prey births from 381 to 418, and episodes lasted about
+  1,050 to 1,170 decisions. Its partial run was deleted.
+- **AW-14** (75% movement share): the resting cost is 25% of run T's fixed
+  rate, a speed cost adds 75% at full speed (5), and a prey sprinting at 5.5
+  pays 0.25 + 0.75 × 5.5 / 5 = 107.5% (unchanged calibration, section 19).
+  Running.
 
 ## Findings so far
 

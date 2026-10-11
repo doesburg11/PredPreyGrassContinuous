@@ -563,6 +563,44 @@ move); here a stopped animal pays the resting cost only. And their line holds
 within the range of steady running speeds, without the costs of speeding up,
 braking or turning, which the zero acceleration costs leave out.
 
+### How large is the movement share in real animals?
+
+Taylor, Heglund and Maloiy (1982) fitted the energy use of running birds and
+mammals with one equation (oxygen in ml per second per kg of body mass `M`
+in kg, speed `v` in m/s):
+
+```text
+energy use per kg  =  0.533 × M^-0.316 × v   +   0.300 × M^-0.303
+                      (cost of running)          (cost at zero speed)
+```
+
+For a 50 kg animal, about a deer or a wolf, this gives:
+
+| Speed | Running cost | Cost at zero speed | Share from movement |
+|---|---:|---:|---:|
+| 1 m/s (walking) | 0.16 | 0.09 | about 60% |
+| 3 m/s (trotting) | 0.47 | 0.09 | about 83% |
+| 5 m/s (running) | 0.78 | 0.09 | about 89% |
+
+Three points make the real share even larger: the cost at zero speed in
+this line is already about 1.7 times the resting metabolism of a lying
+animal (it includes standing ready to move); the line describes steady
+running, while short sprints such as chases also use anaerobic energy and
+cost more; and smaller animals pay more per kg to run. Running at speed
+therefore costs roughly 5 to 10 times as much as resting, which in this
+model's terms is a movement share `s` of about 0.8 to 0.9 at full speed.
+Over a whole day, wild animals spend only about 2 to 3 times their resting
+rate (their field metabolic rate), because they rest, walk and graze much
+of the time; that is a daily average, not the cost of moving.
+
+The model's default movement share (10%) is therefore far below the
+biological value. Larger shares were tested in `RESULTS.md` (sections 17 to
+20): with equal top speeds they let the predators, which move slower on
+average, starve less and wipe out the prey (1 of 50 episodes coexisting at
+50%). In nature, prey survive such costs through advantages such as speed,
+agility, early detection, groups and cover, so a realistic movement share
+may only work together with a realistic prey advantage.
+
 Reference: C. R. Taylor, N. C. Heglund and G. M. O. Maloiy (1982). Energetics
 and mechanics of terrestrial locomotion. I. Metabolic energy consumption as a
 function of speed and body size in birds and mammals. *Journal of
