@@ -32,6 +32,7 @@ switch keep their letters; new runs get only an ID.
 | AW-10 | Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
 | AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
 | AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | completed |
+| AW-13 | | `2026-10-11_20-10-11_350322` | T final | 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | running |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -40,7 +41,8 @@ defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 `runs/continue_T_control.py` (Y0), `runs/continue_T_move25.py` (Z25) and
 `runs/continue_T_move50.py` (Z50). A 75% run (Z75) was stopped after about
 120 iterations, once Z25 and Z50 showed the trend, and deleted.
-`runs/continue_T_move25_fastprey.py` (AW-12).
+`runs/continue_T_move25_fastprey.py` (AW-12), `runs/continue_T_move50_fastprey.py`
+(AW-13).
 
 ## Settings compared with run L
 
