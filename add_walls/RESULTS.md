@@ -31,7 +31,7 @@ switch keep their letters; new runs get only an ID.
 | AW-09 | Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
 | AW-10 | Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
 | AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
-| AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | running |
+| AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -544,7 +544,59 @@ that 5.5 costs exactly the fixed rate was rejected, for three reasons:
    18), below the old top speed, where they pay exactly what they paid in
    run Z25. Only sprints above 5 cost more.
 
-Running.
+Per episode, in blocks of 250 iterations:
+
+| Iterations | Predator births | Prey births | Episode length (decisions) | Run Z25 length |
+|---|---:|---:|---:|---:|
+| 1–250 | 34.9 | 412 | 1,104 | 757 |
+| 251–500 | 30.8 | 398 | 1,072 | 690 |
+| 501–750 | 26.9 | 374 | 1,014 | 711 |
+| 751–1000 | 21.3 | 341 | 930 | 715 |
+
+**Final check with 50 episodes** (`final_check_50.csv`, iteration 990, seeds
+0–49):
+
+| | Run Y0 (0%, prey 5) | Run Z25 (25%, prey 5) | Run AW-12 (25%, prey 5.5) |
+|---|---:|---:|---:|
+| Coexisting | 40 | 11 | 15 |
+| Prey extinct | 7 | 37 | **0** |
+| Predators extinct | 3 | 2 | **35** |
+| Length (physics steps) | 7,248 | 4,856 | 5,532 |
+| Catch risk | 2.50 | 4.50 | **0.82** |
+| Predators / prey alive on average | 6.2 / 20.6 | 7.6 / 12.3 | 4.7 / 38.6 |
+| Predators starved per episode | 37.1 | 24.4 | 23.5 |
+| Prey starved per episode | 40.1 | 6.7 | **96.4** |
+
+**Tournament** (checkpoints every 100 iterations, 10 episodes per matchup;
+`tournament.csv`): both species survived in 567 of 1,000 episodes,
+predators died out in 405, prey in 28. Newer predators catch more in only
+**8%** of pairs: they got worse almost throughout. Their catch risk
+averaged over all prey fell from 2.75 (iteration 100) to 0.76 (iteration
+990), and the share of episodes in which they died out rose from 9% to 69%
+with the predator checkpoint. Newer prey are harder to catch in 52% of
+pairs, so the prey did not need to improve further.
+
+**Speed choices** (`analysis/speed_choices.json`, 10 episodes):
+
+| | Run Z25 predators | Run AW-12 predators | Run Z25 prey | Run AW-12 prey |
+|---|---:|---:|---:|---:|
+| Full / half / stop | 64% / 17% / 18% | 37% / 30% / 33% | 91% / 5% / 3% | 89% / 7% / 3% |
+| Mean speed | 3.22 | **2.27** | 4.31 | 4.67 |
+| Time near grass | 41% | 48% | 24% | 11% |
+| Stopping near grass | 28% | 36% | 1% | 1% |
+
+**Conclusion:** a 10% speed advantage outweighs the 25% movement cost by far
+and reverses the balance: prey become hard to catch (catch risk 0.82), and
+the predators die out in 35 of 50 episodes. Instead of chasing harder, the
+predators learned to chase less: they ran at full speed 37% of the time
+instead of 64%, stopped twice as often, and waited near grass more. With
+fast prey this cheap waiting fails, catches became rarer, and the predator
+policy kept getting worse through training, as in add_group_hunting run W
+when predators became too weak. The prey, now limited by food rather than
+predation, avoid grass more (11% of their time near it, against 24%). The
+balanced setting lies between: for example a smaller speed advantage, or
+the same advantage with a larger movement share.
+
 
 ## Findings so far
 
@@ -574,7 +626,12 @@ Running.
    already move slower than prey (mean speed 3.3 against 4.4, stopping
    near grass), so the same behaviour costs them less; they do not learn
    to wait more.
-8. **With walls and the speed-dependent cost, both species keep improving**
+8. **Faster prey outweigh a movement cost by far** (run AW-12): prey at top
+   speed 5.5 against 5, at 25% movement share, are hardly catchable
+   (catch risk 0.82) and the predators die out in 35 of 50 episodes. The
+   predators respond by chasing less, not more, and degrade through
+   training.
+9. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
