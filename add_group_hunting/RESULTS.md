@@ -14,12 +14,17 @@ are as defined in the [add_reproduction log](../add_reproduction/RESULTS.md).
 
 ## Run index
 
-| Run | Folder (`runs/add_group_hunting_…`) | Started from | Iterations | What changed | Status |
-|---|---|---|---:|---|---|
-| U | `2026-10-09_19-40-02_971713` | scratch | 1,000 | run Q's world, every animal's energy visible (baseline) | completed |
-| V | `2026-10-09_20-24-36_412858` | scratch | 1,000 | as U, plus group hunting | completed |
-| W | `2026-10-09_23-38-48_765124` | scratch | 3,000 | as V, with run U's catch efficiency 0.5 | completed |
-| X | `2026-10-10_18-06-09_675127` | scratch | 3,000 | as W, with catch efficiency 0.75 | completed |
+Run IDs: the letters A to Z ran out, so every run also has an ID of module
+prefix and number (AR = add_reproduction, AW = add_walls, GH =
+add_group_hunting), numbered in the order the runs started. Runs before the
+switch keep their letters; new runs get only an ID.
+
+| ID | Run | Folder (`runs/add_group_hunting_…`) | Started from | Iterations | What changed | Status |
+|---|---|---|---|---:|---|---|
+| GH-01 | U | `2026-10-09_19-40-02_971713` | scratch | 1,000 | run Q's world, every animal's energy visible (baseline) | completed |
+| GH-02 | V | `2026-10-09_20-24-36_412858` | scratch | 1,000 | as U, plus group hunting | completed |
+| GH-03 | W | `2026-10-09_23-38-48_765124` | scratch | 3,000 | as V, with run U's catch efficiency 0.5 | completed |
+| GH-04 | X | `2026-10-10_18-06-09_675127` | scratch | 3,000 | as W, with catch efficiency 0.75 | completed |
 
 Both runs: no walls, 48 speed actions, fixed energy cost, moving grass,
 predators see grass, `energy_observe_others = True` (37 inputs). Run U uses

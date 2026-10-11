@@ -27,22 +27,27 @@ number comes from an evaluation whose output was not saved, it is marked
 
 ## Run index
 
-| Run | Folder (`runs/add_reproduction_…`) | Started from | Iterations | What changed | Status |
-|---|---|---|---:|---|---|
-| A | `2026-10-04_23-48-12_573698` | scratch | 4,607 | baseline: Aquarium's speeds and sizes | stopped |
-| B | `2026-10-05_12-25-58_654906` | scratch | 311 | prey as fast as predators, prey see farther | stopped |
-| C | `2026-10-05_13-03-36_352152` | scratch | 409 | smaller bodies (catch distance 32) | stopped |
-| D | `2026-10-05_14-05-03_102196` | scratch | 385 | predators gain half a prey's energy | stopped |
-| E | `2026-10-05_18-18-53_020370` | scratch | 1,000 | same as D, full length | completed |
-| F | `2026-10-05_23-47-59_932848` | E final | 300 | prey frozen, only predators train | completed |
-| G | `2026-10-06_09-55-47_528702` | E final | 150 | as F, plus +3 reward per catch | completed |
-| — | `2026-10-06_19-50-02_166744` | scratch | 0 | failed at start (RLlib env check, fixed) | failed |
-| H | `2026-10-06_19-52-31_442849` | scratch | 1,000 | moving grass | completed |
-| I | `2026-10-06_22-25-55_664977` | H final | 1,000 | continuation of H | completed |
-| J | `2026-10-07_09-38-10_103867` | I final | 1,000 | continuation of I | completed |
-| K | `2026-10-07_15-34-38_396259` | J final | 517 | prey faster than predators (5.5 vs 5) | stopped |
-| L | `2026-10-07_18-42-19_138184` | scratch | 1,000 | moving grass, predators see grass | completed |
-| M | `2026-10-07_21-26-01_880217` | L final | 3,000 | continuation of L | completed |
+Run IDs: the letters A to Z ran out, so every run also has an ID of module
+prefix and number (AR = add_reproduction, AW = add_walls, GH =
+add_group_hunting), numbered in the order the runs started. Runs before the
+switch keep their letters; new runs get only an ID.
+
+| ID | Run | Folder (`runs/add_reproduction_…`) | Started from | Iterations | What changed | Status |
+|---|---|---|---|---:|---|---|
+| AR-01 | A | `2026-10-04_23-48-12_573698` | scratch | 4,607 | baseline: Aquarium's speeds and sizes | stopped |
+| AR-02 | B | `2026-10-05_12-25-58_654906` | scratch | 311 | prey as fast as predators, prey see farther | stopped |
+| AR-03 | C | `2026-10-05_13-03-36_352152` | scratch | 409 | smaller bodies (catch distance 32) | stopped |
+| AR-04 | D | `2026-10-05_14-05-03_102196` | scratch | 385 | predators gain half a prey's energy | stopped |
+| AR-05 | E | `2026-10-05_18-18-53_020370` | scratch | 1,000 | same as D, full length | completed |
+| AR-06 | F | `2026-10-05_23-47-59_932848` | E final | 300 | prey frozen, only predators train | completed |
+| AR-07 | G | `2026-10-06_09-55-47_528702` | E final | 150 | as F, plus +3 reward per catch | completed |
+| — | — | `2026-10-06_19-50-02_166744` | scratch | 0 | failed at start (RLlib env check, fixed) | failed |
+| AR-08 | H | `2026-10-06_19-52-31_442849` | scratch | 1,000 | moving grass | completed |
+| AR-09 | I | `2026-10-06_22-25-55_664977` | H final | 1,000 | continuation of H | completed |
+| AR-10 | J | `2026-10-07_09-38-10_103867` | I final | 1,000 | continuation of I | completed |
+| AR-11 | K | `2026-10-07_15-34-38_396259` | J final | 517 | prey faster than predators (5.5 vs 5) | stopped |
+| AR-12 | L | `2026-10-07_18-42-19_138184` | scratch | 1,000 | moving grass, predators see grass | completed |
+| AR-13 | M | `2026-10-07_21-26-01_880217` | L final | 3,000 | continuation of L | completed |
 
 Common to all runs: 6 predators and 8 prey at the start, 100 grass patches,
 `max_time_steps = 8000`, `action_repeat = 8`, sparse rewards (+10 per birth,

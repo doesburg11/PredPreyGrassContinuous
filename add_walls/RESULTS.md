@@ -13,19 +13,24 @@ are as defined in the add_reproduction log.
 
 ## Run index
 
-| Run | Folder (`runs/add_walls_…`) | Started from | Iterations | What changed | Status |
-|---|---|---|---:|---|---|
-| N | `2026-10-08_11-27-42_148248` | scratch | 1,000 | walls, speed actions, linear movement cost | completed |
-| O | `2026-10-08_16-02-39_634931` | N final | 2,000 | continuation of N | completed |
-| P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | completed |
-| Q | `2026-10-08_22-52-21_564755` | scratch | 1,000 | as P, with run L's fixed energy cost (control) | completed |
-| R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
-| S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
-| T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
-| Y | `2026-10-11_02-04-58_294484` | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | completed |
-| Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
-| Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
-| Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
+Run IDs: the letters A to Z ran out, so every run also has an ID of module
+prefix and number (AR = add_reproduction, AW = add_walls, GH =
+add_group_hunting), numbered in the order the runs started. Runs before the
+switch keep their letters; new runs get only an ID.
+
+| ID | Run | Folder (`runs/add_walls_…`) | Started from | Iterations | What changed | Status |
+|---|---|---|---|---:|---|---|
+| AW-01 | N | `2026-10-08_11-27-42_148248` | scratch | 1,000 | walls, speed actions, linear movement cost | completed |
+| AW-02 | O | `2026-10-08_16-02-39_634931` | N final | 2,000 | continuation of N | completed |
+| AW-03 | P | `2026-10-08_20-13-41_273170` | scratch | 1,000 | as N, without walls (control) | completed |
+| AW-04 | Q | `2026-10-08_22-52-21_564755` | scratch | 1,000 | as P, with run L's fixed energy cost (control) | completed |
+| AW-05 | R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
+| AW-06 | S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
+| AW-07 | T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
+| AW-08 | Y | `2026-10-11_02-04-58_294484` | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | completed |
+| AW-09 | Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
+| AW-10 | Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
+| AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
