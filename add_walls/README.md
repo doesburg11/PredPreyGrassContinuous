@@ -519,8 +519,14 @@ then `original_decay * (0.5 + 0.5 * actual_speed / 5)`:
 | Half speed (2.5) | 0.0140625 | 0.0046875 | 75% |
 | Full speed (5) | 0.01875 | 0.00625 | 100% |
 
-This calibration uses speed 5 as the reference; changing maximum speeds also
-requires revisiting the speed coefficients to preserve the full-speed total.
+This calibration uses speed 5 as the reference. When a species gets a higher
+top speed, the speed coefficients are deliberately left unchanged: running
+faster then costs more, as for real animals of the same body size (Taylor,
+Heglund and Maloiy, 1982), and the faster species gets no hidden energy
+subsidy, so the top speed is the only thing that changes (RESULTS.md,
+section 19). For example, prey with top speed 5.5 at 25% movement share pay
+0.75 + 0.25 × 5.5 / 5 = 102.5% of the fixed rate when running flat out, and
+exactly the old rate at speeds up to 5.
 
 ### Why the cost is linear in speed
 

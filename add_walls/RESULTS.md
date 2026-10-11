@@ -31,6 +31,7 @@ switch keep their letters; new runs get only an ID.
 | AW-09 | Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
 | AW-10 | Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
 | AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
+| AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | running |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -39,6 +40,7 @@ defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 `runs/continue_T_control.py` (Y0), `runs/continue_T_move25.py` (Z25) and
 `runs/continue_T_move50.py` (Z50). A 75% run (Z75) was stopped after about
 120 iterations, once Z25 and Z50 showed the trend, and deleted.
+`runs/continue_T_move25_fastprey.py` (AW-12).
 
 ## Settings compared with run L
 
@@ -511,6 +513,38 @@ escape, save about a third as much. That lowers predator starvation, raises
 predator numbers and turns the prey from food-limited to predation-limited
 (section 17). Predators spent somewhat more time near grass at 25% (41%
 against 35%), a possible small behavioural contribution.
+
+## 19. Faster prey under a movement cost (run AW-12)
+
+Section 18 found that a movement cost favours the slower species, here the
+predators, whose sit-and-wait style near grass becomes cheaper. Run AW-12
+tests whether faster prey restore the balance: run Z25's settings (25% of
+the energy cost from movement), with the prey's top speed raised from 5 to
+5.5 while predators keep 5. A prey can then outrun a predator, so waiting
+near grass and chasing alone should catch fewer prey, and predators would
+have to work harder, and pay for it under the movement cost. Like the other
+runs of the series it continues run T's final checkpoint for 1,000
+iterations without walls; it is compared with run Z25 (11 of 50 coexisting)
+and run Y0 (40 of 50).
+
+**Energy calibration.** The speed cost per unit of speed is left unchanged,
+so a prey running at its new top speed pays slightly more than the fixed
+rate: 0.75 + 0.25 × 5.5 / 5 = 102.5% at 25% movement share. Recalibrating so
+that 5.5 costs exactly the fixed rate was rejected, for three reasons:
+
+1. **Biology.** In Taylor, Heglund and Maloiy (1982), the extra power of
+   running rises with speed at the same rate for animals of the same body
+   mass. Predators and prey have the same body size here, so a faster prey
+   should pay more for running faster, not get its extra speed for free.
+2. **One change at a time.** Recalibrating would also lower the prey's cost
+   per unit of speed: a hidden energy subsidy on top of the higher top
+   speed. Run AW-12 would then differ from run Z25 in two ways, and a
+   difference could come from either.
+3. **The extra cost only applies when used.** Prey average about 4.4 (section
+   18), below the old top speed, where they pay exactly what they paid in
+   run Z25. Only sprints above 5 cost more.
+
+Running.
 
 ## Findings so far
 
