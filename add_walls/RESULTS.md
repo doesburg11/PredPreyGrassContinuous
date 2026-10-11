@@ -468,6 +468,45 @@ statistically distinguishable from the control with 50 episodes (p = 0.18),
 but the series suggests it carries a small cost too. Run P's collapse at 50%
 from scratch is reproduced from a healthy, trained starting point.
 
+## 18. Why movement costs favour the predators (runs Y0, Y, Z25)
+
+Section 17 showed that predators starve less as the movement share grows.
+The obvious explanation, predators learning to wait more, was tested by
+recording every agent's chosen speed in 10 episodes of each run's final
+checkpoint (`analysis/speed_choices.py`; output `analysis/speed_choices.json`
+in each run). "Near grass" means within 64 units of an available patch.
+
+| | Y0 (0%) | Y (10%) | Z25 (25%) |
+|---|---|---|---|
+| Predators: full / half / stop | 64% / 20% / 16% | 63% / 20% / 18% | 64% / 17% / 18% |
+| Predators: mean speed (maximum 5) | 3.33 | 3.29 | 3.22 |
+| Predators: stopping near grass / elsewhere | 25% / 12% | 26% / 13% | 28% / 12% |
+| Predators: time near grass | 36% | 35% | 41% |
+| Prey: full / half / stop | 92% / 5% / 3% | 94% / 4% / 2% | 91% / 5% / 3% |
+| Prey: mean speed | 4.38 | 4.45 | 4.31 |
+
+The predators do not wait more as the movement share grows: their speed
+choices are nearly the same in all three runs. They already stopped twice as
+often near grass as elsewhere in run Y0, without any movement cost, a
+sit-and-wait habit inherited from run T. What separates the species is speed:
+predators average about 3.3, prey about 4.4, because prey escape by running.
+
+With a cost of (1 − s) + s × speed / 5 times the fixed rate, the same
+behaviour therefore costs predators less than prey:
+
+| Share of the fixed cost paid at the observed mean speeds | Predators | Prey |
+|---|---:|---:|
+| s = 10% | 96.6% | 98.9% |
+| s = 25% | 91.1% | 96.6% |
+
+**Conclusion:** a movement-based cost favours whichever species moves least.
+Here that is the predators, whose existing sit-and-wait style near grass
+becomes cheaper without any change in behaviour; prey, which have to run to
+escape, save about a third as much. That lowers predator starvation, raises
+predator numbers and turns the prey from food-limited to predation-limited
+(section 17). Predators spent somewhat more time near grass at 25% (41%
+against 35%), a possible small behavioural contribution.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -492,7 +531,11 @@ from scratch is reproduced from a healthy, trained starting point.
    more predators survive. 10% is not significantly different from 0%
    (p = 0.18). Continuing run T to 4,000 iterations raised coexistence to
    80% (40 of 50).
-7. **With walls and the speed-dependent cost, both species keep improving**
+7. **Movement costs favour the slower species** (section 18): predators
+   already move slower than prey (mean speed 3.3 against 4.4, stopping
+   near grass), so the same behaviour costs them less; they do not learn
+   to wait more.
+8. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
