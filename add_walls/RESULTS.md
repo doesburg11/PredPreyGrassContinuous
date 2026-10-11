@@ -33,7 +33,8 @@ switch keep their letters; new runs get only an ID.
 | AW-11 | Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
 | AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | completed |
 | AW-13 | | (deleted) | T final | 478 of 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | stopped, see section 20 |
-| AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | running |
+| AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | completed |
+| AW-15 | | (running) | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | running |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -43,7 +44,8 @@ defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 `runs/continue_T_move50.py` (Z50). A 75% run (Z75) was stopped after about
 120 iterations, once Z25 and Z50 showed the trend, and deleted.
 `runs/continue_T_move25_fastprey.py` (AW-12), `runs/continue_T_move50_fastprey.py`
-(AW-13), `runs/continue_T_move75_fastprey.py` (AW-14).
+(AW-13), `runs/continue_T_move75_fastprey.py` (AW-14), `runs/aw15.py` (AW-15, written by
+`runs/next_after_aw14.py`).
 
 ## Settings compared with run L
 
@@ -631,7 +633,44 @@ run AW-12's speed advantage (prey 5.5, predators 5):
 - **AW-14** (75% movement share): the resting cost is 25% of run T's fixed
   rate, a speed cost adds 75% at full speed (5), and a prey sprinting at 5.5
   pays 0.25 + 0.75 × 5.5 / 5 = 107.5% (unchanged calibration, section 19).
-  Running.
+
+Run AW-14, per episode in blocks of 100 iterations: episode length rose from
+679 decisions (iterations 1–100) to about 940 (501–600) and then levelled
+off at about 905–947; predator births about 28 and prey births about 290–300
+per episode from iteration 400 on.
+
+**Final check, run AW-14** (`final_check_50.csv`, 50 episodes): both species
+alive in **21 of 50**, prey extinct in 29, predators in none. Length 5,807
+physics steps, catch risk 3.93, 10.8 predators and 11.6 prey alive on
+average, 21.6 predators and 15.6 prey starved per episode.
+
+**Tournament** (`tournament.csv`): both survived in 410 of 1,000 episodes,
+prey died out in 589. Newer prey are harder to catch in **80%** of pairs,
+newer predators catch more in 36%; in the second half 66% and 54%. Prey catch
+risk averaged over all predators fell from 4.71 (iteration 100) to 3.86
+(iteration 990); the predators' stayed at about 3.9–4.3.
+
+**Speed choices** (`analysis/speed_choices.json`, 10 episodes): the
+predators became thorough sit-and-wait hunters: full speed 30%, half 22%,
+stop **49%**, mean speed 1.81, 65% of their time near grass and stopped
+there 56% of the time (run AW-12, at 25%: 37% / 30% / 33%, mean speed 2.27,
+48% near grass). Prey: 90% full speed, mean speed 4.67, 21% of their time
+near grass.
+
+**Interpretation:** with 75% of the cost from movement, waiting costs
+predators only a quarter of running, and they wait almost half the time,
+mostly at grass. That ambush is cheap enough to beat prey 10% faster than
+them: the prey died out in more than half of the episodes, although they
+kept improving. Between AW-12 (25%: predators extinct in 35 of 50) and
+AW-14 (75%: prey extinct in 29 of 50), the speed advantage that balances a
+75% movement share is larger than 5.5.
+
+**Run AW-15** was chosen automatically by `runs/next_after_aw14.py` from
+AW-14's final check (rule "prey extinct in ≥ 20 of 50": the prey advantage
+is too small; decision in AW-14's `decision.txt`): 75% movement share with
+prey top speed **6.0**, from run T's final checkpoint, 1,000 iterations. A
+prey sprinting at 6.0 pays 0.25 + 0.75 × 6 / 5 = 115% of the fixed rate.
+Running.
 
 ## Findings so far
 
