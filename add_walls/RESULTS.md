@@ -22,8 +22,8 @@ are as defined in the add_reproduction log.
 | R | `2026-10-09_05-19-18_892579` | scratch | 1,000 | walls, speed actions, fixed energy cost (new defaults) | completed |
 | S | `2026-10-09_09-28-39_319209` | R final | 2,000 | continuation of R | completed |
 | T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
-| Y | (queued) | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | queued |
-| Y0 | (queued) | T final | 1,000 | control for Y: T's fixed cost unchanged | queued |
+| Y | `2026-10-11_02-04-58_294484` | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | completed |
+| Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -362,6 +362,60 @@ them, the same world reaches 1 of 20. The pattern of runs E to M is back,
 though: prey keep improving and predators stop after a few hundred
 iterations (55% of pairs overall, 34% late), so there is still no arms race.
 
+## 16. A gentle movement cost (runs Y and Y0)
+
+Run P showed that a speed-dependent cost which halves the cost of standing
+still turns the balance against the prey. Runs Y and Y0 test a gentle
+version on the working ecosystem of run T. Both continue run T's final
+checkpoint for 1,000 iterations, without walls, and differ only in the
+energy cost:
+
+| Cost per physics step | Run T, Y0 | Run Y | Run P |
+|---|---:|---:|---:|
+| Stopped | 100% | 90% | 50% |
+| Half speed | 100% | 95% | 75% |
+| Full speed | 100% | 100% | 100% |
+
+(Percentages of the fixed cost, 0.15/8 for predators and 0.05/8 for prey.
+Run Y: resting cost 90%, plus a cost linear in speed adding the other 10% at
+full speed.) Because both start from the same policies, run Y0 separates
+the effect of the cost from the effect of training longer.
+
+Per episode, in blocks of 250 iterations:
+
+| Iterations | Run Y: predator / prey births, length | Run Y0: predator / prey births, length |
+|---|---|---|
+| 1–250 | 32.2 / 339, 919 | 32.8 / 348, 937 |
+| 251–500 | 33.9 / 367, 992 | 34.7 / 379, 1,016 |
+| 501–750 | 34.5 / 376, 1,012 | 35.2 / 391, 1,046 |
+| 751–1000 | 35.2 / 397, 1,064 | 34.6 / 396, 1,055 |
+
+**Final checks at iteration 990** (20 episodes each):
+
+| | Run T (iteration 2,990) | Run Y (gentle cost) | Run Y0 (control) |
+|---|---:|---:|---:|
+| Coexisting | 11 | **14** | **17** |
+| Prey extinct | 7 | 4 | 2 |
+| Predators extinct | 2 | 2 | 1 |
+| Length (physics steps) | 5,885 | 6,797 | 7,235 |
+| Catch risk | 3.02 | 2.76 | 2.57 |
+| Predators / prey alive on average | 6.5 / 17.0 | 6.6 / 18.4 | 6.3 / 20.4 |
+
+**Tournaments** (each run's checkpoints every 100 iterations, 10 episodes
+per matchup; `tournament.csv`): both species survived in 568 of 1,000
+episodes in run Y and 578 in run Y0. Newer prey are harder to catch in 60%
+(Y) and 53% (Y0) of pairs, newer predators catch more in 38% and 35%: over
+these 1,000 iterations neither species clearly improved, and the predators
+tended to get slightly worse.
+
+**Conclusion:** the gentle movement cost does not change the ecosystem. Run
+Y and its control are within the spread of 20-episode samples on every
+measure (coexistence 14 against 17 of 20, catch risk 2.76 against 2.57,
+tournament coexistence 57% against 58%). Making standing still 10% cheaper
+does not give predators the advantage that run P's 50% did. Both runs also
+show that run T's ecosystem kept improving with 1,000 more iterations of
+training: coexistence rose from 11 to 14–17 of 20, the healthiest so far.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -380,7 +434,11 @@ iterations (55% of pairs overall, 34% late), so there is still no arms race.
 5. **Without walls, speed actions with the fixed cost give the healthiest
    ecosystem so far** (run T): 11 of 20 coexisting after 3,000 iterations.
    Predators again stop improving early, so there is no arms race.
-6. **With walls and the speed-dependent cost, both species keep improving**
+6. **A gentle movement cost is harmless** (run Y against its control Y0):
+   making standing still 10% cheaper leaves the ecosystem unchanged
+   (14 and 17 of 20 coexisting), unlike run P's 50%. Continuing run T to
+   4,000 iterations raised coexistence to 14–17 of 20.
+7. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
