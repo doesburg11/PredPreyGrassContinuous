@@ -100,18 +100,21 @@ config_env = {
     # only scale the own-energy input (energy / max).
     "energy_predator_max": 24.0,
     "energy_prey_max": 16.0,
-    # Resting metabolic cost: lost every physics step, even when stopped.
-    # With the speed costs at 0 (default) this is the whole, fixed cost, as in
-    # add_reproduction: moving and standing still cost the same.
-    "energy_predator_resting_metabolic_cost": 0.15 / 8,
-    "energy_prey_resting_metabolic_cost": 0.05 / 8,
-    # Optional cost linear in actual speed (arena units per step), as for
-    # running animals (Taylor, Heglund & Maloiy 1982; README). Off by default:
-    # it let predators wait cheaply and turned the balance against the prey
-    # (RESULTS.md, runs P and Q). Runs N to P used resting 0.15 / 8 / 2 and
-    # 0.05 / 8 / 2 with speed costs 0.15 / 8 / (2 * 5) and 0.05 / 8 / (2 * 5).
-    "energy_predator_speed_cost": 0.0,
-    "energy_prey_speed_cost": 0.0,
+    # Gentle movement cost (run Y): a resting cost of 90% of add_reproduction's
+    # fixed rate (0.15 / 8 and 0.05 / 8), lost every physics step even when
+    # stopped, plus a cost linear in actual speed (arena units per step), as
+    # for running animals (Taylor, Heglund & Maloiy 1982; README), adding the
+    # other 10% at full speed (5). Full speed costs the fixed rate; stopping
+    # saves 10%. Run Y left the ecosystem unchanged against its control;
+    # run P's 50/50 split let predators wait cheaply and wiped out the prey
+    # (RESULTS.md, runs P, Q and Y). Fixed cost: resting 0.15 / 8 and
+    # 0.05 / 8, speed costs 0 (runs Q to T). Runs N to P used resting
+    # 0.15 / 8 / 2 and 0.05 / 8 / 2, speed 0.15 / 8 / (2 * 5) and
+    # 0.05 / 8 / (2 * 5).
+    "energy_predator_resting_metabolic_cost": 0.9 * 0.15 / 8,
+    "energy_prey_resting_metabolic_cost": 0.9 * 0.05 / 8,
+    "energy_predator_speed_cost": 0.1 * 0.15 / 8 / 5,
+    "energy_prey_speed_cost": 0.1 * 0.05 / 8 / 5,
     # Optional cost per squared change in velocity; off.
     # Acceleration/braking limits still apply to movement physics.
     "energy_predator_acceleration_cost": 0.0,
