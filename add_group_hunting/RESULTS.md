@@ -19,7 +19,7 @@ are as defined in the [add_reproduction log](../add_reproduction/RESULTS.md).
 | U | `2026-10-09_19-40-02_971713` | scratch | 1,000 | run Q's world, every animal's energy visible (baseline) | completed |
 | V | `2026-10-09_20-24-36_412858` | scratch | 1,000 | as U, plus group hunting | completed |
 | W | `2026-10-09_23-38-48_765124` | scratch | 3,000 | as V, with run U's catch efficiency 0.5 | completed |
-| X | `2026-10-10_18-06-09_675127` | scratch | 3,000 | as W, with catch efficiency 0.75 | running |
+| X | `2026-10-10_18-06-09_675127` | scratch | 3,000 | as W, with catch efficiency 0.75 | completed |
 
 Both runs: no walls, 48 speed actions, fixed energy cost, moving grass,
 predators see grass, `energy_observe_others = True` (37 inputs). Run U uses
@@ -316,6 +316,68 @@ rewards randomness on every step, while the only real reward, a birth,
 became rarer as the predators got worse, so the bonus increasingly outweighed
 it and pulled the policy back towards random behaviour.
 
+## 6. Group hunting with catch efficiency 0.75 (run X)
+
+Run X is run W with catch efficiency 0.75, between run V's 1.0 (predators
+boomed) and run W's 0.5 (predators died out); 3,000 iterations from scratch.
+Per episode, in blocks of 250 iterations, with the predator policy's
+entropy:
+
+| Iterations | Predator births | Prey births | Episode length (decisions) | Predator entropy |
+|---|---:|---:|---:|---:|
+| 1–250 | 44.3 | 263 | 648 | 2.19 |
+| 251–500 | 30.1 | 157 | 388 | 1.20 |
+| 501–750 | 27.0 | 140 | 346 | 0.98 |
+| 751–1000 | 26.2 | 136 | 338 | 0.88 |
+| 1001–1250 | 25.4 | 134 | 333 | 0.79 |
+| 1251–1500 | 25.8 | 138 | 341 | 0.75 |
+| 1501–1750 | 23.9 | 126 | 311 | 0.73 |
+| 1751–2000 | 24.1 | 128 | 317 | 0.70 |
+| 2001–2250 | 23.9 | 128 | 316 | 0.70 |
+| 2251–2500 | 23.5 | 124 | 306 | 0.70 |
+| 2501–2750 | 23.7 | 127 | 315 | 0.69 |
+| 2751–3000 | 23.7 | 126 | 311 | 0.68 |
+
+From iteration 500 on, the ecosystem settled: about 24–26 predator births
+and 125–140 prey births per episode, episodes of about 310–340 decisions,
+and a predator policy that kept becoming less random (entropy 0.68 at the
+end; run W: 2.0–2.4). There was no predator decline as in run W and no
+boom-and-crash as in run V.
+
+**Final check at iteration 2,990** (`final_check.csv`, 20 episodes): prey
+extinct in all 20, after 1,377 physics steps on average. Catch risk 5.29.
+Per episode: 11.0 predators and 14.0 prey alive on average, 20.0 predator
+births, 11.9 predators starved, 103 prey caught and 96 born, 1.0 prey
+starved.
+
+**Tournament** (checkpoints every 300 iterations, 10 episodes per matchup;
+`tournament.csv`): prey died out in 924 of 1,000 episodes, predators in 63,
+both survived in 13. Newer prey are harder to catch in **70%** of pairs,
+newer predators catch more in **67%**; in the first half (iterations
+300–1,800) 73% and 74%, in the second half (1,800–2,990) 54% and 48%.
+
+| Checkpoint | 300 | 600 | 900 | 1200 | 1500 | 1800 | 2100 | 2400 | 2700 | 2990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 4.30 | 5.27 | 5.24 | 5.78 | 5.60 | 5.77 | 5.72 | 5.45 | 6.00 | 5.69 |
+| Prey: catch risk averaged over all predators | 6.36 | 5.94 | 5.51 | 5.71 | 5.60 | 5.03 | 5.21 | 5.24 | 5.20 | 5.01 |
+
+Both species improved together in the first half; in the second half
+neither did much (both near 50%). The predators did not degrade as in run W.
+
+**Group attacks** (`analysis/group_catches_X.json`, iteration 2,990, 20
+episodes): 4,350 attacks, 49% successful, 10.5 predators alive on average.
+**49%** of attacks had a second predator within 64 units (17% if predators
+were spread at random), and **64%** of catches were made by two or more
+hunters. Success by hunters: alone 34%, two 57%, three or more 77%. At equal
+predator numbers, run X's predators attack with company about as often as
+run V's (8–13 predators: 50%, run V 55%, run U's control 36%).
+
+**Conclusion:** catch efficiency 0.75 gives group hunting a stable
+ecosystem in which predators stay viable and their policy keeps sharpening,
+and most catches are now made in groups. But the prey still die out in
+every final-check episode, and after about 1,800 iterations neither species
+improves further: a stable standoff, not a lasting arms race.
+
 ## Findings so far
 
 1. **Seeing other animals' energy helps the predators** (run U against
@@ -334,3 +396,7 @@ it and pulled the policy back towards random behaviour.
    first 1,500 iterations (88% and 78% of pairs) their policy degrades
    (30% late). Group attacks become more frequent over training (20% of
    attacks, 33% of catches, against 7% expected by chance).
+5. **With catch efficiency 0.75, group hunting is stable but not an arms
+   race** (run X): predators stay viable and most catches (64%) are made in
+   groups, but prey die out in every final-check episode, and both species
+   stop improving after about 1,800 iterations.
