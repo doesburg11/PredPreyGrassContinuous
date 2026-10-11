@@ -378,6 +378,44 @@ and most catches are now made in groups. But the prey still die out in
 every final-check episode, and after about 1,800 iterations neither species
 improves further: a stable standoff, not a lasting arms race.
 
+## 7. Do predators team up against strong prey? (run X)
+
+With steepness 2 and prey strength 2, hunting together pays against
+well-fed prey and not against weak ones. Purposeful cooperation would
+therefore show as more company at attacks on high-energy prey. Predators
+also crowd near grass, where prey are well fed, so the same link can arise
+without any cooperation. The test compares run X's predators with a control:
+run U's predators (never trained with group hunting) played in run X's world
+(group hunting on, catch efficiency 0.75), 20 episodes each, seeds 0–19
+(`analysis/group_catches.py`; outputs `analysis/group_catches_X.json` and
+`analysis/group_catches_U_control_X.json` in run X). The analysis
+(`analysis/conditional_grouping.py`, output
+`analysis/conditional_grouping.txt` in run X) fits a logistic regression of
+"at least two predators within 64 units of the prey" on the prey's energy
+and the log number of living predators.
+
+| | Run X | Control (run U's predators in run X's world) |
+|---|---:|---:|
+| Attacks | 4,350 | 9,728 |
+| Living predators at an attack (mean) | 10.5 | 9.7 |
+| Attacks with company | **49%** | 34% |
+| …against prey in the lowest energy quartile (below 3.0) | 42% | 27% |
+| …against prey in the highest energy quartile (above 6.0) | 56% | 42% |
+| Prey-energy coefficient (log-odds per energy unit, 95% bootstrap) | +0.14 (+0.11 to +0.17) | +0.15 (+0.13 to +0.18) |
+
+Both groups of predators attack well-fed prey with company more often, and
+by the same amount: the coefficients are equal within their intervals. The
+link therefore comes from where predators and well-fed prey meet, not from
+predators choosing to team up against strong prey. What run X's predators do
+differently is attack with company more often overall, at every prey energy
+(by about 15 percentage points at similar predator numbers). The bootstrap
+treats attacks as independent although attacks within an episode are
+related, so the intervals are somewhat too narrow; the conclusion does not
+depend on them, since the two coefficients are nearly equal.
+
+**Conclusion:** run X's predators have learned to hunt in company more
+often, but not to do so selectively against the prey for which it pays.
+
 ## Findings so far
 
 1. **Seeing other animals' energy helps the predators** (run U against
@@ -400,3 +438,6 @@ improves further: a stable standoff, not a lasting arms race.
    race** (run X): predators stay viable and most catches (64%) are made in
    groups, but prey die out in every final-check episode, and both species
    stop improving after about 1,800 iterations.
+6. **Grouping is general, not targeted** (run X against a control): trained
+   group hunters attack with company more often (49% against 34%), but not
+   more so against well-fed prey, against which grouping pays.
