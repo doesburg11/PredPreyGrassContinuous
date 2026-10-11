@@ -105,7 +105,8 @@ config_env = {
     # stopped, plus a cost linear in actual speed (arena units per step), as
     # for running animals (Taylor, Heglund & Maloiy 1982; README), adding the
     # other 10% at full speed (5). Full speed costs the fixed rate; stopping
-    # saves 10%. Run Y left the ecosystem unchanged against its control;
+    # saves 10%. Run Y did not differ significantly from its control (33
+    # against 40 of 50 coexisting, p = 0.18); 25% and 50% clearly hurt the prey;
     # run P's 50/50 split let predators wait cheaply and wiped out the prey
     # (RESULTS.md, runs P, Q and Y). Fixed cost: resting 0.15 / 8 and
     # 0.05 / 8, speed costs 0 (runs Q to T). Runs N to P used resting

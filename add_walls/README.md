@@ -491,9 +491,11 @@ Resting costs are `energy_predator_resting_metabolic_cost` and
 `add_reproduction`'s fixed rate plus a speed cost adding the other 10% at
 full speed, so standing still saves 10%. Run Q showed that run P's stronger
 version (standing still saving 50%) turned the balance against the prey,
-because it let predators wait cheaply and stop starving; run Y showed that
-the gentle version leaves the ecosystem unchanged (see
-[RESULTS.md](RESULTS.md), sections 11, 12 and 16). For the fixed cost of
+because it let predators wait cheaply and stop starving. A dose-response
+series showed coexistence of 40, 33, 11 and 1 of 50 episodes with 0%, 10%,
+25% and 50% of the cost from movement: the gentle 10% is not significantly
+different from a fixed cost, larger shares clearly hurt the prey (see
+[RESULTS.md](RESULTS.md), sections 11, 12, 16 and 17). For the fixed cost of
 runs Q to T, set the resting costs to 0.15 / 8 and 0.05 / 8 and both speed
 costs to 0. Both `energy_predator_acceleration_cost` and
 `energy_prey_acceleration_cost` are also **0.0**. Acceleration, braking, turns and collision-induced

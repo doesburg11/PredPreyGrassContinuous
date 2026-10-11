@@ -24,12 +24,16 @@ are as defined in the add_reproduction log.
 | T | `2026-10-09_14-00-28_001411` | Q final | 2,000 | continuation of Q | completed |
 | Y | `2026-10-11_02-04-58_294484` | T final | 1,000 | gentle movement cost: resting 90% of T's cost, linear speed cost adds 10% at full speed | completed |
 | Y0 | `2026-10-11_05-09-56_037528` | T final | 1,000 | control for Y: T's fixed cost unchanged | completed |
+| Z25 | `2026-10-11_09-45-20_409365` | T final | 1,000 | 25% of the cost from movement | completed |
+| Z50 | `2026-10-11_12-04-23_210330` | T final | 1,000 | 50% of the cost from movement | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
 defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 `runs/continue_fixed_cost_control.py` (T), `runs/continue_T_gentle_cost.py` (Y),
-`runs/continue_T_control.py` (Y0).
+`runs/continue_T_control.py` (Y0), `runs/continue_T_move25.py` (Z25) and
+`runs/continue_T_move50.py` (Z50). A 75% run (Z75) was stopped after about
+120 iterations, once Z25 and Z50 showed the trend, and deleted.
 
 ## Settings compared with run L
 
@@ -416,6 +420,54 @@ does not give predators the advantage that run P's 50% did. Both runs also
 show that run T's ecosystem kept improving with 1,000 more iterations of
 training: coexistence rose from 11 to 14–17 of 20, the healthiest so far.
 
+## 17. How much movement cost does the ecosystem tolerate? (runs Y0, Y, Z25, Z50)
+
+A dose-response series on the protocol of section 16: every run continues
+run T's final checkpoint for 1,000 iterations without walls, and only the
+share of the energy cost that depends on movement differs. A resting cost of
+(100 − s)% of run T's fixed cost is paid every physics step, and a cost
+linear in speed adds the other s% at full speed, so full speed always costs
+run T's rate and standing still saves s%.
+
+Per episode, averaged over the last 250 training iterations:
+
+| Run | Movement share s | Predator births | Prey births | Episode length (decisions) |
+|---|---:|---:|---:|---:|
+| Y0 | 0% | 34.6 | 396 | 1,055 |
+| Y | 10% | 35.2 | 397 | 1,064 |
+| Z25 | 25% | 25.9 | 257 | 715 |
+| Z50 | 50% | 17.0 | 160 | 467 |
+
+**Final checks with 50 episodes** (`final_check_50.csv` in each run,
+iteration 990, seeds 0–49; Fisher's exact test of coexistence against Y0):
+
+| Run | s | Coexisting | Prey extinct | Predators extinct | Length (physics steps) | Catch risk | Predators starved | Prey starved | Predators / prey alive |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Y0 | 0% | **40** | 7 | 3 | 7,248 | 2.50 | 37.1 | 40.1 | 6.2 / 20.6 |
+| Y | 10% | 33 (p = 0.18) | 12 | 5 | 6,664 | 2.67 | 36.2 | 34.2 | 6.6 / 18.9 |
+| Z25 | 25% | 11 (p < 0.001) | 37 | 2 | 4,856 | 4.50 | 24.4 | 6.7 | 7.6 / 12.3 |
+| Z50 | 50% | 1 (p < 0.001) | 49 | 0 | 2,245 | 5.28 | 9.2 | 2.3 | 8.7 / 10.2 |
+
+The 20-episode checks of section 16 (14 and 17 of 20 for Y and Y0) agree
+with these within sampling spread.
+
+**Tournaments** (checkpoints every 100 iterations, 10 episodes per matchup;
+`tournament.csv`): both species survived in 568 of 1,000 episodes in run Y,
+578 in Y0, 231 in Z25 and 106 in Z50. Newer prey are harder to catch in
+54% (Z25) and 44% (Z50) of pairs, newer predators catch more in 65% and
+74%; in the second half (iterations 600–990) 68% and 64% (Z25), 50% and
+62% (Z50).
+
+**Conclusion:** the more of the energy cost depends on movement, the worse
+the prey fare, gradually rather than at a sharp threshold. The mechanism is
+visible in starvation: with s = 0% about 37 predators starve per episode, at
+25% about 24 and at 50% about 9, because waiting gets cheaper. More
+predators survive, prey are caught more often, and coexistence falls from
+80% (Y0) to 66% (10%), 22% (25%) and 2% (50%). The 10% step is not
+statistically distinguishable from the control with 50 episodes (p = 0.18),
+but the series suggests it carries a small cost too. Run P's collapse at 50%
+from scratch is reproduced from a healthy, trained starting point.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -434,10 +486,12 @@ training: coexistence rose from 11 to 14–17 of 20, the healthiest so far.
 5. **Without walls, speed actions with the fixed cost give the healthiest
    ecosystem so far** (run T): 11 of 20 coexisting after 3,000 iterations.
    Predators again stop improving early, so there is no arms race.
-6. **A gentle movement cost is harmless** (run Y against its control Y0):
-   making standing still 10% cheaper leaves the ecosystem unchanged
-   (14 and 17 of 20 coexisting), unlike run P's 50%. Continuing run T to
-   4,000 iterations raised coexistence to 14–17 of 20.
+6. **The ecosystem tolerates only a small movement cost** (runs Y0, Y,
+   Z25, Z50): with 0%, 10%, 25% and 50% of the cost depending on movement,
+   coexistence was 40, 33, 11 and 1 of 50, because cheaper waiting lets
+   more predators survive. 10% is not significantly different from 0%
+   (p = 0.18). Continuing run T to 4,000 iterations raised coexistence to
+   80% (40 of 50).
 7. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
