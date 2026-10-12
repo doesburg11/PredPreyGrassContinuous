@@ -40,6 +40,8 @@ switch keep their letters; new runs get only an ID.
 | AW-18 | | `2026-10-12_09-08-16_686040` | AW-17 final | 2,000 | continuation of AW-17, to test whether its arms race lasts | completed |
 | AW-19 | | `2026-10-12_17-11-38_670812` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
 | AW-20 | | `2026-10-12_17-11-58_920036` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
+| AW-21 | | `2026-10-12_22-13-21_309675` | scratch | 3,000 | the AW-17 world (no walls, 75% movement share, prey 6.0, 20 grass clusters) trained from scratch | running |
+| AW-22 | | `2026-10-12_22-13-41_293112` | scratch | 3,000 | replicate of AW-21 (new training randomness) | running |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -50,7 +52,8 @@ defaults of commit `441cae8`; `runs/continue_walls_fixed_cost.py` (S),
 120 iterations, once Z25 and Z50 showed the trend, and deleted.
 `runs/continue_T_move25_fastprey.py` (AW-12), `runs/continue_T_move50_fastprey.py`
 (AW-13), `runs/continue_T_move75_fastprey.py` (AW-14), `runs/aw15.py` (AW-15, written by
-`runs/next_after_aw14.py`), `runs/aw16.py` (AW-16), `runs/aw17.py` (AW-17), `runs/aw18.py` (AW-18), `runs/aw19.py` and `runs/aw20.py` (AW-19, AW-20).
+`runs/next_after_aw14.py`), `runs/aw16.py` (AW-16), `runs/aw17.py` (AW-17), `runs/aw18.py` (AW-18), `runs/aw19.py` and `runs/aw20.py` (AW-19, AW-20), `runs/aw21.py` and `runs/aw22.py`
+(AW-21, AW-22).
 
 ## Settings compared with run L
 
