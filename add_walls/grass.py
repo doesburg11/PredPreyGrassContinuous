@@ -245,18 +245,21 @@ class GrassLayer:
             if patch.regrow is not None and self.available(patch):
                 self.place(patch)
         eaten = {}
-        for patch in self.patches:
+        torus = self.env.torus
+        prey = [p for p in self.env.prey if p.alive]
+        near = self.prey_in_reach(prey)
+        for index, patch in enumerate(self.patches):
             if not self.available(patch):
                 continue
+            # The pre-filter only narrows the search; the original distance
+            # and tie-break decide, so outcomes are exactly as before.
             candidates = []
-            for prey in self.env.prey:
-                if not prey.alive:
-                    continue
-                distance = self.env.torus.get_distance_in_torus(
-                    prey.position, patch.position
+            for j in near.get(index, ()):
+                distance = torus.get_distance_in_torus(
+                    prey[j].position, patch.position
                 )
                 if distance <= self.consume_radius:
-                    candidates.append((distance, prey.id()))
+                    candidates.append((distance, prey[j].id()))
             if candidates:
                 _, agent = min(candidates)
                 eaten[agent] = eaten.get(agent, 0) + 1
@@ -270,6 +273,35 @@ class GrassLayer:
         if self.overgrazing:
             self.check_overgrazing()
         return eaten
+
+    def prey_in_reach(self, prey):
+        """{patch index: indices into prey} of the living prey that may be
+        within consume_radius of each available patch, from one vectorized
+        torus distance computation (in float64 with a small margin, so no
+        candidate is missed by rounding). advance() confirms each candidate exactly."""
+        if not prey:
+            return {}
+        indices = [i for i, patch in enumerate(self.patches) if self.available(patch)]
+        if not indices:
+            return {}
+        width, height = self.env.torus.width, self.env.torus.height
+        patch_xy = np.array(
+            [(self.patches[i].position.x, self.patches[i].position.y) for i in indices],
+            dtype=np.float64,
+        )
+        prey_xy = np.array([(p.position.x, p.position.y) for p in prey], dtype=np.float64)
+        delta = np.abs(patch_xy[:, None, :] - prey_xy[None, :, :])
+        delta = np.minimum(delta, np.array([width, height], dtype=np.float64) - delta)
+        # Distances, not squares (no overflow for huge radii), with a margin
+        # wide enough for rounding even in float32 positions (about 0.01
+        # units on an 800-unit arena). The exact check in advance() decides.
+        margin = 1e-5 * max(self.consume_radius, width, height) + 1e-6
+        reach = np.hypot(delta[..., 0], delta[..., 1]) <= self.consume_radius + margin
+        rows, columns = np.nonzero(reach)
+        near = {}
+        for row, column in zip(rows.tolist(), columns.tolist()):
+            near.setdefault(indices[row], []).append(column)
+        return near
 
     def place(self, patch):
         """Position a patch that regrows now (it stays hidden until then)."""

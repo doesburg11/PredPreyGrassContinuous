@@ -593,3 +593,176 @@ def test_sprite_pose_mirrors_and_tilts_but_never_turns_over():
     # Straight up keeps the facing; stopping keeps the whole pose.
     assert sprite_pose(0.0, -2.0, previous=(False, 5.0), max_tilt=10.0) == (False, 10.0)
     assert sprite_pose(0.0, 0.0, previous=(False, -12.0)) == (False, -12.0)
+
+
+def _reference_advance(layer):
+    """advance() before vectorization: every patch against every prey."""
+    layer.tick += 1
+    for patch in layer.patches:
+        if patch.regrow is not None and layer.available(patch):
+            layer.place(patch)
+    eaten = {}
+    for patch in layer.patches:
+        if not layer.available(patch):
+            continue
+        candidates = []
+        for prey in layer.env.prey:
+            if not prey.alive:
+                continue
+            distance = layer.env.torus.get_distance_in_torus(
+                prey.position, patch.position
+            )
+            if distance <= layer.consume_radius:
+                candidates.append((distance, prey.id()))
+        if candidates:
+            _, agent = min(candidates)
+            eaten[agent] = eaten.get(agent, 0) + 1
+            patch.ready_at = layer.tick + layer.respawn_delay
+            if layer.random_respawn:
+                patch.position = layer.spot(patch.cluster)
+            elif layer.dispersal:
+                patch.regrow = "disperse"
+            layer.total_consumed += 1
+    if layer.overgrazing:
+        layer.check_overgrazing()
+    return eaten
+
+
+@pytest.mark.parametrize(
+    "grass",
+    [
+        {"grass_clustered": True, "grass_dispersal": True, "grass_overgrazing": True},
+        {"grass_clustered": True, "grass_cluster_count": 20, "grass_cluster_spread": 24.0,
+         "grass_dispersal": True, "grass_overgrazing": True},
+        {"grass_clustered": False, "grass_random_respawn": True},
+    ],
+)
+def test_vectorized_advance_matches_the_reference(grass):
+    """Two identical environments, one with the old advance(): every step,
+    the same patches are eaten by the same prey, and the grass ends equal."""
+    config = {
+        "predator_count": 3,
+        "prey_count": 12,
+        "obs_mode": "egocentric",
+        "keep_prey_count_constant": False,
+        "grass_count": 100,
+        "grass_consume_radius": 40.0,  # large, so many patches are contested
+        "max_time_steps": 3000,
+        **grass,
+    }
+    envs = [make_env(dict(config)) for _ in range(2)]
+    try:
+        layers = [env.par_env.aec_env.unwrapped.grass for env in envs]
+        reference = layers[1]
+        reference.advance = lambda: _reference_advance(reference)
+        observations = [env.reset(seed=7)[0] for env in envs]
+        rng = np.random.default_rng(0)
+        consumed = 0
+        for _ in range(600):
+            agents = sorted(observations[0])
+            assert agents == sorted(observations[1])
+            actions = {a: int(rng.integers(envs[0].action_space[a].n)) for a in agents}
+            results = [env.step(dict(actions)) for env in envs]
+            infos = [result[4] for result in results]
+            for agent in infos[0]:
+                assert infos[0][agent].get("grass_eaten", 0) == infos[1][agent].get(
+                    "grass_eaten", 0
+                )
+            observations = [result[0] for result in results]
+            consumed = layers[0].total_consumed
+            if results[0][2]["__all__"] or results[0][3]["__all__"]:
+                break
+        assert consumed > 50  # the comparison covered real grazing
+        assert layers[0].total_consumed == layers[1].total_consumed
+        assert layers[0].rng.getstate() == layers[1].rng.getstate()
+        assert [(c.x, c.y) for c in layers[0].centres] == [
+            (c.x, c.y) for c in layers[1].centres
+        ]
+        assert layers[0].total_collapses == layers[1].total_collapses
+        for a, b in zip(layers[0].patches, layers[1].patches):
+            assert (a.position.x, a.position.y, a.ready_at, a.regrow) == (
+                b.position.x, b.position.y, b.ready_at, b.regrow
+            )
+    finally:
+        for env in envs:
+            env.close()
+
+
+def test_vectorized_advance_matches_the_reference_when_prey_crowd_patches():
+    """Many prey placed right around patches, also across the arena edges,
+    so most patches have several candidates: winners, ties and patch states
+    must match the old advance() exactly."""
+    config = {
+        "predator_count": 1,
+        "prey_count": 30,
+        "obs_mode": "egocentric",
+        "keep_prey_count_constant": False,
+        "grass_count": 60,
+        "grass_consume_radius": 30.0,
+        "grass_clustered": True,
+        "grass_dispersal": True,
+        "grass_overgrazing": True,
+    }
+    envs = [make_env(dict(config)) for _ in range(2)]
+    try:
+        raws = [env.par_env.aec_env.unwrapped for env in envs]
+        for env in envs:
+            env.reset(seed=3)
+        rng = np.random.default_rng(1)
+        contested = 0
+        for _ in range(40):
+            # Same patch and prey positions in both environments.
+            for patch_a, patch_b in zip(raws[0].grass.patches, raws[1].grass.patches):
+                x, y = rng.uniform(0, 800, 2)
+                if rng.random() < 0.3:  # some patches right at an edge
+                    x = rng.choice([1.0, 799.0])
+                for patch in (patch_a, patch_b):
+                    patch.position = Vector(x, y)
+                    patch.ready_at = 0
+                    patch.regrow = None
+            for prey_a, prey_b in zip(raws[0].prey, raws[1].prey):
+                target = raws[0].grass.patches[rng.integers(len(raws[0].grass.patches))]
+                x = (target.position.x + rng.uniform(-35, 35)) % 800
+                y = (target.position.y + rng.uniform(-35, 35)) % 800
+                for prey in (prey_a, prey_b):
+                    prey.position = Vector(x, y)
+            near = raws[0].grass.prey_in_reach([p for p in raws[0].prey if p.alive])
+            contested += sum(len(v) > 1 for v in near.values())
+            eaten = [raws[0].grass.advance(), _reference_advance(raws[1].grass)]
+            assert eaten[0] == eaten[1]
+            for a, b in zip(raws[0].grass.patches, raws[1].grass.patches):
+                assert (a.position.x, a.position.y, a.ready_at, a.regrow) == (
+                    b.position.x, b.position.y, b.ready_at, b.regrow
+                )
+        assert contested > 200  # most rounds had patches with several candidates
+    finally:
+        for env in envs:
+            env.close()
+
+
+def test_prey_in_reach_handles_float32_positions_and_huge_radii():
+    env = make_env(
+        {
+            "predator_count": 1,
+            "prey_count": 1,
+            "obs_mode": "egocentric",
+            "keep_prey_count_constant": False,
+            "grass_count": 1,
+            "grass_consume_radius": 316.9772147765514,
+        }
+    )
+    try:
+        env.reset(seed=0)
+        raw = env.par_env.aec_env.unwrapped
+        patch, prey = raw.grass.patches[0], raw.prey[0]
+        patch.ready_at = 0
+        # Codex's counterexample: float32 coordinates near the radius.
+        patch.position = Vector(np.float32(633.45123), np.float32(365.9952))
+        prey.position = Vector(np.float32(715.917), np.float32(59.933197))
+        exact = raw.torus.get_distance_in_torus(prey.position, patch.position)
+        assert exact <= raw.grass.consume_radius
+        assert raw.grass.prey_in_reach([prey]) == {0: [0]}
+        raw.grass.consume_radius = 1e155  # squaring would overflow
+        assert raw.grass.prey_in_reach([prey]) == {0: [0]}
+    finally:
+        env.close()
