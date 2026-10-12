@@ -34,7 +34,7 @@ switch keep their letters; new runs get only an ID.
 | AW-12 | | `2026-10-11_15-33-38_217711` | T final | 1,000 | as Z25 (25% of the cost from movement), with prey top speed 5.5 | completed |
 | AW-13 | | (deleted) | T final | 478 of 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | stopped, see section 20 |
 | AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | completed |
-| AW-15 | | (running) | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | running |
+| AW-15 | | `2026-10-11_23-44-56_403491` | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -670,7 +670,44 @@ AW-14's final check (rule "prey extinct in ≥ 20 of 50": the prey advantage
 is too small; decision in AW-14's `decision.txt`): 75% movement share with
 prey top speed **6.0**, from run T's final checkpoint, 1,000 iterations. A
 prey sprinting at 6.0 pays 0.25 + 0.75 × 6 / 5 = 115% of the fixed rate.
-Running.
+
+Per episode, in blocks of 250 iterations (predator births / prey births /
+episode length in decisions): 32.0 / 353 / 1,029, then 32.2 / 348 / 1,084,
+29.2 / 302 / 970 and 28.5 / 299 / 967.
+
+**Final checks with 50 episodes:**
+
+| | AW-12 (25%, prey 5.5) | AW-14 (75%, prey 5.5) | AW-15 (75%, prey 6.0) |
+|---|---:|---:|---:|
+| Coexisting | 15 | 21 | 22 |
+| Prey extinct | 0 | 29 | 28 |
+| Predators extinct | 35 | 0 | 0 |
+| Length (physics steps) | 5,532 | 5,807 | 5,651 |
+| Catch risk | 0.82 | 3.93 | 3.63 |
+| Predators / prey alive on average | 4.7 / 38.6 | 10.8 / 11.6 | 11.2 / 12.8 |
+
+**Tournament, run AW-15** (`tournament.csv`): both survived in 585 of 1,000
+episodes, prey died out in 415, predators in none. Newer prey are harder to
+catch in **68%** of pairs and newer predators catch more in **55%**; in the
+second half (iterations 600–990) **64%** and **58%**. Predator catch risk
+averaged over all prey fell from 3.98 (iteration 100) to 2.91 (iteration
+400) and then rose again to 3.78 (iteration 990); coexistence by predator
+checkpoint fell from 79% (iteration 300) to 41–46% (iterations 900–990).
+
+**Speed choices, run AW-15** (10 episodes): predators full / half / stop 28% /
+20% / **52%**, mean speed 1.64, 65% of their time near grass and stopped
+there 60% of the time. Prey 81% / 12% / 8%, mean speed 4.64 (run AW-14: 4.67,
+with top speed 5.5).
+
+**Conclusion:** raising the prey's top speed from 5.5 to 6.0 changed almost
+nothing (22 against 21 of 50 coexisting, catch risk 3.63 against 3.93). The
+prey do not use the extra speed: their mean speed stayed at about 4.65,
+because the predators no longer chase. They wait at grass more than half
+the time, and against an ambush, top speed matters less than seeing the
+predator in time. Run AW-15 also shows both species improving in the second
+half of training (64% and 58% of pairs), the predators after an early dip,
+a sign of continuing co-adaptation in this world.
+
 
 ## Findings so far
 
@@ -705,7 +742,12 @@ Running.
    (catch risk 0.82) and the predators die out in 35 of 50 episodes. The
    predators respond by chasing less, not more, and degrade through
    training.
-9. **With walls and the speed-dependent cost, both species keep improving**
+9. **With a realistic movement share (75%), predators become ambushers**
+   (runs AW-14, AW-15): they stop about half the time, mostly at grass,
+   and faster prey (5.5 or 6.0 against 5) hardly help, since prey speed
+   matters little against an ambush; prey died out in 28–29 of 50
+   episodes, while both species kept improving.
+10. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
