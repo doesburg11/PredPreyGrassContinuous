@@ -35,8 +35,8 @@ switch keep their letters; new runs get only an ID.
 | AW-13 | | (deleted) | T final | 478 of 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | stopped, see section 20 |
 | AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | completed |
 | AW-15 | | `2026-10-11_23-44-56_403491` | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | completed |
-| AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 1,000 (of 2,000 planned) | continuation of AW-15; stopped after 1,000 iterations, the control for AW-17 | running |
-| AW-17 | | (queued) | AW-15 final | 1,000 | as AW-15, grass spread out: 20 clusters of 5 patches (spread 24) instead of 5 of 20 (spread 48); compared with AW-16 at iteration 990 | queued |
+| AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 1,005 (of 2,000 planned) | continuation of AW-15; stopped after 1,000 iterations, the control for AW-17 | completed |
+| AW-17 | | `2026-10-12_04-53-41_449174` | AW-15 final | 1,000 | as AW-15, grass spread out: 20 clusters of 5 patches (spread 24) instead of 5 of 20 (spread 48); compared with AW-16 at iteration 990 | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -737,6 +737,63 @@ come to eat, often head-on (56% of prey were moving towards the catcher).
 What makes it work is that food is concentrated in a few predictable places
 that prey must visit; spreading the grass is the more promising lever.
 
+## 22. Spreading the grass against the ambush (runs AW-16 and AW-17)
+
+Section 21 traced the ambush to concentrated food: predators wait at the few
+grass clusters that prey must visit. Run AW-17 spreads the same 100 patches
+over **20 clusters of 5** (spread 24) instead of 5 clusters of 20 (spread
+48), so predators cannot guard all the food. Both runs continue run AW-15's
+final checkpoint (75% movement share, prey top speed 6.0, predators 5) for
+1,000 iterations; AW-16 keeps the old grass and is the control (planned for
+2,000 iterations, stopped after 1,005 and evaluated at iteration 990).
+
+Run AW-17 per episode, in blocks of 250 iterations (predator births / prey
+births / episode length in decisions): 33.0 / 405 / 1,114, then 32.4 / 419 /
+1,133, 31.9 / 421 / 1,145 and 32.7 / 428 / 1,171. Run AW-16 over the same
+iterations: about 28 / 290 / 940.
+
+**Final checks with 50 episodes** (iteration 990; AW-16:
+`final_check_990_50.csv`, AW-17: `final_check_50.csv`; Fisher's exact test of
+coexistence):
+
+| | AW-16 (5 clusters of 20) | AW-17 (20 clusters of 5) |
+|---|---:|---:|
+| Coexisting | 31 | **43** (p = 0.011) |
+| Prey extinct | 19 | 6 |
+| Predators extinct | 0 | 1 |
+| Length (physics steps) | 6,335 | 7,539 |
+| Catch risk | 3.58 | 3.37 |
+| Predators / prey alive on average | 11.3 / 12.4 | 11.4 / 16.8 |
+| Predator / prey births per episode | 28.1 / 294 | 33.2 / 426 |
+| Predators / prey starved per episode | 22.5 / 16.0 | 26.8 / 12.6 |
+
+**Behaviour** (`analysis/speed_choices*.json`, `analysis/catch_speeds*.json`,
+10 episodes each):
+
+| | AW-16 | AW-17 |
+|---|---:|---:|
+| Predators: full / half / stop | 23% / 19% / 58% | 36% / 22% / 42% |
+| Predators: mean speed | 1.50 | 2.18 |
+| Predators: time near grass | 66% | 42% |
+| Prey: mean speed | 4.72 | 5.11 |
+| Catches within 64 units of grass | 70% | 47% |
+| Catches with the predator running | 88% | 95% |
+
+**Tournaments:** run AW-17 (`tournament.csv`, checkpoints every 100
+iterations): both survived in 772 of 1,000 episodes; newer prey are harder
+to catch in **85%** of pairs and newer predators catch more in **68%**
+(second half 60% and 50%). Runs AW-15 and AW-16 together
+(`tournament_combined.csv` in AW-16, checkpoints every 200 iterations):
+75% and 72%, second half 60% and 62%.
+
+**Conclusion:** spreading the food weakens the ambush, as expected.
+Predators wait less (42% against 58% of the time stopped) and spend less
+time at grass (42% against 66%), fewer catches happen there (47% against
+70%), and coexistence rises from 31 to 43 of 50 episodes (p = 0.011), close
+to run Y0's level without movement costs (40 of 50). Both species breed
+more, so the ecosystem as a whole is healthier, not just the prey. In both
+worlds both species kept improving against each other in the tournaments.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -777,7 +834,11 @@ that prey must visit; spreading the grass is the more promising lever.
    episodes, while both species kept improving.
 10. **The ambush is a short lunge at the food, not a catch-rule artefact**
    (section 21): 87% of catches happen at speed, 70% near grass.
-11. **With walls and the speed-dependent cost, both species keep improving**
+11. **Spreading the food restores the balance under a realistic movement
+   cost** (section 22): 20 clusters of 5 instead of 5 of 20 raised
+   coexistence from 31 to 43 of 50 (p = 0.011) at 75% movement share with
+   prey at 6.0, because predators can no longer wait at all the food.
+12. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
