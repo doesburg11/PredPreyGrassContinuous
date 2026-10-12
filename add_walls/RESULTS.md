@@ -37,7 +37,7 @@ switch keep their letters; new runs get only an ID.
 | AW-15 | | `2026-10-11_23-44-56_403491` | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | completed |
 | AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 1,005 (of 2,000 planned) | continuation of AW-15; stopped after 1,000 iterations, the control for AW-17 | completed |
 | AW-17 | | `2026-10-12_04-53-41_449174` | AW-15 final | 1,000 | as AW-15, grass spread out: 20 clusters of 5 patches (spread 24) instead of 5 of 20 (spread 48); compared with AW-16 at iteration 990 | completed |
-| AW-18 | | `2026-10-12_09-08-16_686040` | AW-17 final | 2,000 | continuation of AW-17, to test whether its arms race lasts | running |
+| AW-18 | | `2026-10-12_09-08-16_686040` | AW-17 final | 2,000 | continuation of AW-17, to test whether its arms race lasts | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -795,6 +795,52 @@ to run Y0's level without movement costs (40 of 50). Both species breed
 more, so the ecosystem as a whole is healthier, not just the prey. In both
 worlds both species kept improving against each other in the tournaments.
 
+## 23. Does the arms race last? (runs AW-17 and AW-18)
+
+Run AW-17 (spread-out grass, 75% movement share, prey top speed 6.0) showed
+both species improving throughout its 1,000 iterations. Run AW-18 continued
+it for 2,000 iterations with the same settings, 3,000 in total. Per
+episode, the ecosystem stayed remarkably constant over all 3,000
+iterations: about 32 predator births, 405–428 prey births and 1,110–1,170
+decisions per episode. Both policies kept becoming slightly more decisive
+(entropy: predators 0.66 to 0.58, prey 0.43 to 0.35), with stable value
+fits (predators about 0.60, prey 0.35).
+
+**Final check after 3,000 iterations** (`final_check_50.csv` in AW-18, 50
+episodes): both species alive in **40 of 50** (AW-17 after 1,000: 43 of 50;
+Fisher's exact test p = 0.6), prey extinct in 9, predators in 1; catch risk
+3.29, 11.4 predators and 17.1 prey alive on average.
+
+**Tournament over AW-17 and AW-18** (`tournament_combined.csv` in AW-18, 14
+checkpoints every 200 iterations, 10 episodes per matchup): both survived
+in 1,495 of 1,960 episodes, prey died out in 431, predators in 34.
+
+| Checkpoints | Newer prey harder to catch | Newer predators catch more |
+|---|---:|---:|
+| 200–800 | **96%** | **79%** |
+| 1,200–2,000 | **70%** | **82%** |
+| 2,200–2,990 | 36% | 40% |
+| All | 83% | 76% |
+
+| Checkpoint | 200 | 600 | 1,200 | 1,600 | 2,000 | 2,200 | 2,600 | 2,990 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Predator: catch risk averaged over all prey | 2.10 | 2.88 | 3.04 | 3.45 | 3.46 | 3.54 | 3.55 | 3.57 |
+| Prey: catch risk averaged over all predators | 4.41 | 3.69 | 3.23 | 3.18 | 2.95 | 2.68 | 2.89 | 2.71 |
+
+Each checkpoint against its training partner stayed between 2.7 and 4.1
+throughout, while the newest predators against the oldest prey reached a
+catch risk of 4.26 and the oldest predators against the newest prey only
+1.01. Behaviour at the end matched AW-17's (`analysis/` in each run):
+predators stopped 43% of the time (AW-17 42%), spent 40% of their time near
+grass (42%), and 46% of catches happened near grass (47%).
+
+**Conclusion:** the longest arms race in these experiments. For about 2,000
+iterations both species improved against each other, predators by about
+70% in catch effectiveness and prey by about 40% in escape, while staying
+evenly matched (a Red Queen pattern). From about iteration 2,200 neither
+improved further: the race settled into a stable, healthy plateau with
+coexistence in about four of five episodes.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -839,7 +885,11 @@ worlds both species kept improving against each other in the tournaments.
    cost** (section 22): 20 clusters of 5 instead of 5 of 20 raised
    coexistence from 31 to 43 of 50 (p = 0.011) at 75% movement share with
    prey at 6.0, because predators can no longer wait at all the food.
-12. **With walls and the speed-dependent cost, both species keep improving**
+12. **The longest arms race** (section 23): in the same world, both species
+   improved against each other for about 2,000 iterations (96% / 79% and
+   70% / 82% of tournament pairs in the first two periods) while staying
+   evenly matched, then levelled off; coexistence stayed at 40 of 50.
+13. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
