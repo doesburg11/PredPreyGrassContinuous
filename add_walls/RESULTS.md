@@ -710,6 +710,32 @@ half of training (64% and 58% of pairs), the predators after an early dip,
 a sign of continuing co-adaptation in this world.
 
 
+## 21. Is the ambush a flaw of the catch rule? (runs AW-15, Y0)
+
+A catch is contact between bodies, so a standing predator catches any prey
+that touches it. If many catches happened that way, ambush would be
+unrealistically easy. `analysis/catch_speeds.py` recorded, at every catch in
+10 episodes of each final checkpoint, the catcher's speed, whether the prey
+was moving towards it, and the distance to grass (output
+`analysis/catch_speeds.json` in each run):
+
+| | AW-15 (75%, prey 6.0) | Y0 (0%, prey 5) |
+|---|---:|---:|
+| Catches | 2,905 | 3,913 |
+| Predator speed below 0.5 (standing) | 5% | 1% |
+| Predator speed 0.5–2.5 | 8% | 5% |
+| Predator speed 2.5 or more | 87% | 94% |
+| Median predator speed at a catch | 4.64 | 4.76 |
+| Prey moving towards the predator | 56% | 45% |
+| Catches within 64 units of grass | 70% | 50% |
+
+**Conclusion:** the catch rule is not the problem: 87% of catches in AW-15
+happen at speed, and only 5% are prey touching a standing predator. The
+ambush is real but short: predators wait at grass and lunge at prey that
+come to eat, often head-on (56% of prey were moving towards the catcher).
+What makes it work is that food is concentrated in a few predictable places
+that prey must visit; spreading the grass is the more promising lever.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -748,7 +774,9 @@ a sign of continuing co-adaptation in this world.
    and faster prey (5.5 or 6.0 against 5) hardly help, since prey speed
    matters little against an ambush; prey died out in 28–29 of 50
    episodes, while both species kept improving.
-10. **With walls and the speed-dependent cost, both species keep improving**
+10. **The ambush is a short lunge at the food, not a catch-rule artefact**
+   (section 21): 87% of catches happen at speed, 70% near grass.
+11. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
