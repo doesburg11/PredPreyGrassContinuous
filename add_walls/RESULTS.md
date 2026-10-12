@@ -35,7 +35,7 @@ switch keep their letters; new runs get only an ID.
 | AW-13 | | (deleted) | T final | 478 of 1,000 | as Z50 (50% of the cost from movement), with prey top speed 5.5 | stopped, see section 20 |
 | AW-14 | | `2026-10-11_21-31-48_098348` | T final | 1,000 | 75% of the cost from movement, prey top speed 5.5 | completed |
 | AW-15 | | `2026-10-11_23-44-56_403491` | T final | 1,000 | 75% of the cost from movement, prey top speed 6.0 (chosen automatically from AW-14) | completed |
-| AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 2,000 | continuation of AW-15 | running |
+| AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 1,000 (of 2,000 planned) | continuation of AW-15; stopped after 1,000 iterations, the control for AW-17 | running |
 | AW-17 | | (queued) | AW-15 final | 1,000 | as AW-15, grass spread out: 20 clusters of 5 patches (spread 24) instead of 5 of 20 (spread 48); compared with AW-16 at iteration 990 | queued |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
