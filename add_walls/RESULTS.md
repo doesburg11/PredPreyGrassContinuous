@@ -38,8 +38,8 @@ switch keep their letters; new runs get only an ID.
 | AW-16 | | `2026-10-12_02-28-12_990364` | AW-15 final | 1,005 (of 2,000 planned) | continuation of AW-15; stopped after 1,000 iterations, the control for AW-17 | completed |
 | AW-17 | | `2026-10-12_04-53-41_449174` | AW-15 final | 1,000 | as AW-15, grass spread out: 20 clusters of 5 patches (spread 24) instead of 5 of 20 (spread 48); compared with AW-16 at iteration 990 | completed |
 | AW-18 | | `2026-10-12_09-08-16_686040` | AW-17 final | 2,000 | continuation of AW-17, to test whether its arms race lasts | completed |
-| AW-19 | | `2026-10-12_17-11-38_670812` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | running |
-| AW-20 | | `2026-10-12_17-11-58_920036` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | running |
+| AW-19 | | `2026-10-12_17-11-38_670812` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
+| AW-20 | | `2026-10-12_17-11-58_920036` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -843,6 +843,48 @@ evenly matched (a Red Queen pattern). From about iteration 2,200 neither
 improved further: the race settled into a stable, healthy plateau with
 coexistence in about four of five episodes.
 
+## 24. Replicating the spread-out grass result (runs AW-19 and AW-20)
+
+Every result before this section came from a single training run. Runs
+AW-19 and AW-20 repeat run AW-17 exactly (same settings, same start from
+run AW-15's final checkpoint, 1,000 iterations), with new training
+randomness; they ran side by side on 14 simulation workers each. Run AW-16
+(same start, concentrated grass) is the control.
+
+**Final checks with 50 episodes** (iteration 990; Fisher's exact test of
+coexistence against AW-16):
+
+| | AW-16 (control, 5 clusters) | AW-17 | AW-19 | AW-20 |
+|---|---:|---:|---:|---:|
+| Coexisting | 31 | 43 (p = 0.011) | 44 (p = 0.005) | 42 (p = 0.023) |
+| Prey extinct | 19 | 6 | 5 | 7 |
+| Predators extinct | 0 | 1 | 1 | 1 |
+| Catch risk | 3.58 | 3.37 | 2.73 | 3.25 |
+| Predators / prey alive on average | 11.3 / 12.4 | 11.4 / 16.8 | 10.5 / 20.2 | 11.0 / 17.5 |
+| Predator / prey births per episode | 28.1 / 294 | 33.2 / 426 | 31.6 / 428 | 32.0 / 426 |
+| Predators stopped | 58% | 42% | 38% | 40% |
+| Predators' time near grass | 66% | 42% | 40% | 41% |
+| Catches near grass | 70% | 47% | 46% | 46% |
+
+Pooled, the three replicates coexisted in 129 of 150 episodes against the
+control's 31 of 50 (p < 0.001).
+
+**Tournaments** (checkpoints every 100 iterations, 10 episodes per matchup;
+share of pairs in which the newer checkpoint does better, prey / predators):
+
+| Run | All | Iterations 100–300 | 400–600 | 700–990 |
+|---|---:|---:|---:|---:|
+| AW-17 | 85% / 68% | 100% / 89% | 100% / 78% | 71% / 62% |
+| AW-19 | 91% / 75% | 100% / 100% | 89% / 78% | 79% / 62% |
+| AW-20 | 86% / 71% | 100% / 100% | 89% / 78% | 71% / 38% |
+
+**Conclusion:** the result replicates closely. All three runs coexist in
+42–44 of 50 episodes, against 31 for the control; predators wait less and
+away from the grass in all three; and in all three tournaments both species
+improved against each other, most strongly in the first two thirds. In the
+last third the prey kept improving in every replicate, the predators in two
+of three.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -891,7 +933,11 @@ coexistence in about four of five episodes.
    improved against each other for about 2,000 iterations (96% / 79% and
    70% / 82% of tournament pairs in the first two periods) while staying
    evenly matched, then levelled off; coexistence stayed at 40 of 50.
-13. **With walls and the speed-dependent cost, both species keep improving**
+13. **The spread-out grass result replicates** (section 24): three
+   independent training runs from the same start coexist in 43, 44 and 42
+   of 50 episodes (pooled 129 of 150, against 31 of 50 for the control,
+   p < 0.001), with the same behaviour and both species improving in each.
+14. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
