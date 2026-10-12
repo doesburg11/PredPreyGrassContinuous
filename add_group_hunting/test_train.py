@@ -24,7 +24,7 @@ def outputs_in_tmp(monkeypatch, tmp_path):
 
 def test_learning_defaults():
     env, args = train.load_settings()
-    assert args.num_env_runners == 16
+    assert args.num_env_runners == 28
     assert args.num_gpus_per_learner == 1
     assert args.train_batch_size == 4800
     assert args.minibatch_size == 1024
@@ -145,7 +145,7 @@ def test_file_settings_reach_ppo_and_environment(monkeypatch):
     assert config.grad_clip == 0.5
     assert not config.model_config["vf_share_layers"]
     assert thread_limits == [1]
-    assert config.num_env_runners == 16
+    assert config.num_env_runners == 28
     assert config.num_cpus_per_env_runner == 1
     assert config.num_cpus_for_main_process == 1
     assert config.num_gpus_per_learner == 1

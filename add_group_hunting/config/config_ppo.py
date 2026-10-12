@@ -10,7 +10,9 @@ RUNS_DIR = Path(__file__).resolve().parents[1] / "runs"
 config_ppo = {
     "mode": "ps",  # "ps": policy per species; "il": policy per individual.
     "iterations": 1000,  # Number of PPO training iterations.
-    "num_env_runners": 16,
+    # 28 of the 32 CPU cores: the batch size, and so learning, is unchanged;
+    # more workers only collect it faster (earlier runs used 16).
+    "num_env_runners": 28,
     "num_learners": 0,
     "num_gpus_per_learner": 1,  # Set to 0 for CPU-only training.
     "train_batch_size": 4800,
