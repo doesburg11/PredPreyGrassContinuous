@@ -86,7 +86,7 @@ differ in where grass grows:
 Orange: predators, left axis. Blue: prey, right axis. The axes use different
 scales; line heights and crossings do not represent equal populations.
 Counts include the initial state and every subsequent physics step, with no
-averaging. [Raw counts](assets/predator_prey_single_step.csv).*
+averaging.*
 
 The populations show irregular predator–prey oscillations resembling a
 Lotka–Volterra pattern: prey can grow when food is available and predator
