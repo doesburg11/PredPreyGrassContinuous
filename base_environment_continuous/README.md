@@ -27,6 +27,8 @@ the quirks that are candidates for a later, deliberate cleanup.
   `add_walls`).
 - [`tournament.py`](tournament.py): every predator checkpoint of a run
   against every prey checkpoint (as in `add_walls`).
+- [`analysis/final_check.py`](analysis/final_check.py): final check of a
+  trained checkpoint.
 - [`tests/`](tests/): the equivalence test against `add_walls` and unit
   tests.
 
@@ -64,10 +66,18 @@ in a different order.
 
 ## Validation runs
 
-BE-01 and BE-02 train the milestone world from scratch with this
+BE-01 and BE-02 trained the milestone world from scratch with this
 environment (3,000 iterations, 14 simulation workers each, side by side),
-as AW-21 and AW-22 did with `add_walls`. Results follow when they finish.
+as AW-21 and AW-22 did with `add_walls`. They reached the same state: 72
+of 100 evaluation episodes with both species surviving against 71 of 100
+for AW-21 and AW-22, the same catch risk, populations and behaviour
+(predators waiting near grass), and the same arms race. Details in
+[RESULTS.md](RESULTS.md).
 
-The environment plays episodes about twice as fast as `add_walls`; a
-training iteration is about 11% faster, since the learner takes most of the
-time.
+Training took 8–15% less wall time (about 9 hours instead of 10 for 3,000
+iterations): the environment plays episodes about twice as fast as
+`add_walls`, but the learner takes most of the time.
+
+`analysis/final_check.py` evaluates a checkpoint (outcomes, catch risk,
+populations, speed choices and time and catches near grass); it also
+accepts checkpoints of `add_walls` runs in the milestone world.
