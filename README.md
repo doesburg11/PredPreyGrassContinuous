@@ -84,6 +84,26 @@ one predator and one prey at the walls, so you can watch what each animal can
 and cannot see. Walls are set with `walls_layout` (default `"blocks"`). See the
 [add_walls README](add_walls/README.md#walls) for how they work.
 
+## The arms race
+
+With realistic movement costs, prey a little faster than their predators and
+grass spread over many small clusters, predators and prey keep improving
+against each other for about 2,000 iterations of training while staying
+evenly matched, the "Red Queen" pattern, before the race levels off. The
+result held in five independent runs. Details in the
+[add_walls RESULTS](add_walls/RESULTS.md) (sections 22 to 25).
+
+<p align="center">
+  <img src="assets/arms_race.png" alt="Line chart over 3,000 training iterations: predators' catch risk against all prey rises from 2.1 to about 3.5, prey's catch risk against all predators falls from 4.4 to about 2.7, and each checkpoint against its own training partner stays around 3 to 4; after about 2,200 iterations all three level off" width="760">
+</p>
+
+*Tournament over runs AW-17 and AW-18: every predator checkpoint plays every
+prey checkpoint. Orange: the predators of a checkpoint against all prey
+(rising: better hunters). Blue: the prey of a checkpoint against all
+predators (falling: better at escaping). Green: each checkpoint against its
+own training partner (flat: still evenly matched). Made with
+`add_walls/analysis/plot_arms_race.py`.*
+
 All subprojects share one Conda environment at the repo root (`.conda/`).
 Training settings live in each module's `config/config_env.py` and
 `config/config_ppo.py`; run training without command-line arguments.
