@@ -75,6 +75,37 @@ differ in where grass grows:
   [add_reproduction README](add_reproduction/README.md#grass) describes the
   mechanisms step by step, with all settings.
 
+## Population dynamics within an episode
+
+<p align="center">
+  <img src="assets/predator_prey_single_step.png" alt="Predator and prey counts at each simulation step: predators range from 2 to 12 on the orange left axis, prey from 1 to 46 on the green right axis" width="900">
+</p>
+
+*Exact counts over 8,002 physics steps in a new evaluation of the
+`add_reproduction` run `2026-10-07_09-38-10_103867`, checkpoint 990, seed 0.
+Orange: predators, left axis. Green: prey, right axis. The axes use different
+scales; line heights and crossings do not represent equal populations.
+Counts include the initial state and every subsequent physics step, with no
+averaging. [Raw counts](assets/predator_prey_single_step.csv).*
+
+The populations show irregular predator–prey oscillations resembling a
+Lotka–Volterra pattern: prey can grow when food is available and predator
+numbers are low, while predator growth follows successful feeding. Near the
+end of this episode, prey peak around step 7,000 and predators around step
+7,500. Grass availability, energy reserves, starvation and threshold-based
+reproduction modify the feedback; this single rollout does not establish a
+classical Lotka–Volterra cycle.
+
+Prey turn over much faster than predators. The saved first evaluation episode
+for this checkpoint recorded 458 prey births and 449 catches, compared with
+36 predator births and 35 predator starvation deaths. Prey feed directly on
+grass; predators receive 50% of a caught prey's energy and reproduce at an
+energy threshold of 12, versus 8 for prey. Energy reserves delay predator
+starvation after prey decline. Predator counts therefore change less often,
+even while individual predators are replaced. They still range from 2 to 12
+in the plotted rollout, compared with 1 to 46 prey: a sixfold predator change,
+so their smaller absolute swings should not be mistaken for constant numbers.
+
 ## Walls: places to hide
 
 `add_walls` adds **walls**: obstacles that block both movement and sight, as
