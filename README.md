@@ -78,12 +78,12 @@ differ in where grass grows:
 ## Population dynamics within an episode
 
 <p align="center">
-  <img src="assets/predator_prey_single_step.png" alt="Predator and prey counts at each simulation step: predators range from 2 to 12 on the orange left axis, prey from 1 to 46 on the green right axis" width="900">
+  <img src="assets/predator_prey_single_step.png" alt="Predator and prey counts at each simulation step: predators range from 2 to 12 on the orange left axis, prey from 1 to 46 on the blue right axis" width="900">
 </p>
 
 *Exact counts over 8,002 physics steps in a new evaluation of the
 `add_reproduction` run `2026-10-07_09-38-10_103867`, checkpoint 990, seed 0.
-Orange: predators, left axis. Green: prey, right axis. The axes use different
+Orange: predators, left axis. Blue: prey, right axis. The axes use different
 scales; line heights and crossings do not represent equal populations.
 Counts include the initial state and every subsequent physics step, with no
 averaging. [Raw counts](assets/predator_prey_single_step.csv).*
