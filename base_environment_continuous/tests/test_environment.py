@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from environment import PredPreyGrassContinuous  # noqa: E402
 from geometry import Vector  # noqa: E402
@@ -81,3 +82,67 @@ def test_equally_near_animals_keep_list_order():
 def test_invalid_settings_are_rejected(setting):
     with pytest.raises(ValueError):
         PredPreyGrassContinuous(setting)
+
+
+def test_watching_does_not_change_an_episode(monkeypatch):
+    """The viewer only reads the state (SPEC.md, section 8)."""
+    pytest.importorskip("pygame")
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from compare import digest, random_actions, snapshot
+    from render import Viewer
+
+    results = []
+    for watch in (False, True):
+        env = PredPreyGrassContinuous()
+        viewer = Viewer(env, window_size=None) if watch else None
+        rng = np.random.default_rng(5)
+        obs, _ = env.reset(seed=5)
+        trace = []
+        actions = random_actions(rng, obs)
+        for _ in range(60):
+            obs, rewards, terms, truncs, infos = env.step(actions)
+            if viewer is not None:
+                frame = viewer.draw()
+                assert frame.shape == (env.height, 2 * env.width, 3)
+            trace.append(digest((obs, rewards, terms, truncs, infos, snapshot(env))))
+            actions = random_actions(rng, obs, terms, truncs)
+        if viewer is not None:
+            viewer.close()
+        results.append(trace)
+    assert results[0] == results[1]
+
+
+def test_viewer_draws_narrow_cones_and_forgets_old_episodes(monkeypatch):
+    pytest.importorskip("pygame")
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from render import Viewer
+
+    env = PredPreyGrassContinuous({"predator_fov": 1, "prey_fov": 360})
+    viewer = Viewer(env, window_size=None)
+    env.reset(seed=0)
+    viewer.reset()
+    viewer.draw()
+    env.reset(seed=1)
+    viewer.reset()
+    viewer.draw()
+    assert viewer.history == [(0, 6, 8)]
+    viewer.close()
+
+
+def test_checkpoint_settings_translate_from_add_walls(tmp_path):
+    import pickle
+
+    from checkpoints import checkpoint_env_config
+
+    def saved(env_config):
+        with open(tmp_path / "class_and_ctor_args.pkl", "wb") as f:
+            pickle.dump({"ctor_args_and_kwargs": (({"env_config": env_config},), {})}, f)
+        return tmp_path
+
+    milestone = {"prey_max_velocity": 6.0, "walls_layout": None,
+                 "predator_max_age": 10**9, "render_mode": None}
+    assert checkpoint_env_config(saved(milestone)) == {"prey_max_velocity": 6.0}
+    for change in ({"predator_max_age": 100}, {"walls_layout": "blocks"},
+                   {"obs_mode": "aquarium"}):
+        with pytest.raises(ValueError):
+            checkpoint_env_config(saved(dict(milestone, **change)))

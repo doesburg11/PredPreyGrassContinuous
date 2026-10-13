@@ -244,8 +244,10 @@ corrected view check, not Aquarium's original).
 ## 8. What is not part of the dynamics
 
 Rendering (pygame view, sprites, view cones, energy bars, grass, the
-population chart) only draws the state and is reimplemented separately;
-it must not draw random numbers.
+population chart) only draws the state and is reimplemented separately
+(`render.py`); it must not draw random numbers or change the state
+(`tests/test_environment.py` checks that an episode is the same with and
+without drawing).
 
 ## 9. Quirks kept for now, candidates for a later cleanup
 

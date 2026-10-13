@@ -14,82 +14,33 @@ Run from the repository root:
     .conda/bin/python -m pytest base_environment_continuous/tests
 """
 
+import importlib.util
 import json
 import os
 import pickle
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 HERE = Path(__file__).resolve().parent
 MODULE = HERE.parent
 sys.path.insert(0, str(MODULE))
+sys.path.insert(0, str(HERE))
 
+from compare import CASES, count_events, exact, snapshot  # noqa: E402
 from environment import PredPreyGrassContinuous  # noqa: E402
 
-# name: (episodes, decisions per episode, first seed, setting overrides,
-#        events that must occur). Random actions.
-CASES = {
-    # Many short episodes: resets, early births, catches and starvation.
-    "short": (40, 120, 0, {}, ("births", "caught", "starved")),
-    # Long episodes: grass collapse, extinction and the time limit.
-    "long": (3, 1100, 1000, {}, ("collapses", "extinct", "time_limit")),
-    # One physics step per decision.
-    "repeat1": (8, 600, 2000, {"action_repeat": 1}, ("births", "caught")),
-    # Small caps and ID pools: births blocked by the cap, pools used up.
-    "caps": (
-        10,
-        400,
-        3000,
-        {
-            "reproduction_max_predators": 8,
-            "reproduction_max_prey": 12,
-            "reproduction_predator_pool": 9,
-            "reproduction_prey_pool": 20,
-        },
-        ("births", "pool_exhausted", "capped"),
-    ),
-}
-
-
-def snapshot(env):
-    animals = {
-        a.id: (a.position.x, a.position.y, a.velocity.x, a.velocity.y,
-               a.acceleration.x, a.acceleration.y, a.orientation, a.energy)
-        for a in env.predators + env.prey
-    }
-    grass = env.grass
-    return {
-        "animals": animals,
-        "patches": [(p.position.x, p.position.y, p.ready_at, p.regrow, p.cluster)
-                    for p in grass.patches],
-        "centres": [(c.x, c.y) for c in grass.centres],
-        "collapsed": list(grass.collapsed),
-        "grass_counters": (grass.tick, grass.total_consumed, grass.total_collapses),
-        "grass_rng": grass.rng.getstate(),
-        "birth_rng": env.birth_rng.getstate(),
-        "next_id": dict(env.next_id),
-        "time_step": env.time_step,
-        "order": [a.id for a in env.entities],
-        "active": sorted(env.active),
-    }
-
-
-def exact(value):
-    """A comparable form that tells apart float bits (-0.0 from 0.0) and
-    types (1 from 1.0, Python from NumPy scalars)."""
-    if isinstance(value, dict):
-        return {key: exact(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return (type(value).__name__, [exact(item) for item in value])
-    if isinstance(value, np.ndarray):
-        return ("array", str(value.dtype), value.shape, value.tobytes())
-    if isinstance(value, (float, np.floating)):
-        return (type(value).__name__, float(value).hex())
-    return (type(value).__name__, value)
+if (
+    not (MODULE.parent / "add_walls" / "env_wrapper.py").is_file()
+    or importlib.util.find_spec("marl_aquarium") is None
+):
+    pytest.skip(
+        "needs add_walls and Aquarium; test_regression.py covers the same cases",
+        allow_module_level=True,
+    )
 
 
 @pytest.fixture(scope="module", params=sorted(CASES))
@@ -112,11 +63,7 @@ def case(request, tmp_path_factory):
 def test_identical_to_add_walls(case):
     overrides, required, reference = case
     env = PredPreyGrassContinuous(overrides)
-    events = dict.fromkeys(
-        ("births", "caught", "starved", "collapses", "extinct", "time_limit",
-         "pool_exhausted", "capped"),
-        0,
-    )
+    events = Counter()
     for episode in reference:
         seed = episode["seed"]
         ref_obs, ref_infos, ref_state = episode["reset"]
@@ -136,26 +83,7 @@ def test_identical_to_add_walls(case):
             assert exact(terms) == exact(r_terms), where
             assert exact(truncs) == exact(r_truncs), where
             assert exact(infos) == exact(r_infos), where
-            for agent, info in infos.items():
-                events["births"] += info.get("born", False)
-                events["starved"] += info.get("starved", False)
-                if agent.startswith("prey") and terms.get(agent) and not info.get("starved"):
-                    events["caught"] += 1
-            if truncs["__all__"] and env.prey and env.predators:
-                events["time_limit"] += 1
-            if not env.prey or not env.predators:
-                events["extinct"] += 1
-            if any(env.next_id[s] >= env.pool[s] for s in env.pool):
-                events["pool_exhausted"] += 1
-            if any(
-                population[s] >= env.max_population[s]
-                and any(
-                    a.energy >= env.threshold[s]
-                    for a in (env.predators if s == "predator" else env.prey)
-                )
-                for s in population
-            ):
-                events["capped"] += 1
+            count_events(env, population, terms, truncs, infos, events)
         events["collapses"] += env.grass.total_collapses
     print(events)
     # The comparison must have exercised the paths this case is for.

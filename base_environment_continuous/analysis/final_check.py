@@ -23,7 +23,6 @@ Episodes use seeds 0, 1, ...
 
 import json
 import math
-import pickle
 import sys
 from collections import Counter
 from pathlib import Path
@@ -33,63 +32,12 @@ sys.path.insert(0, str(MODULE))
 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
-from ray.rllib.core.rl_module.rl_module import RLModule  # noqa: E402
 
-from environment import DEFAULT_CONFIG, PredPreyGrassContinuous  # noqa: E402
-from tournament import SPECIES, classify, sample_actions  # noqa: E402
+from checkpoints import checkpoint_env_config, load_modules  # noqa: E402
+from environment import PredPreyGrassContinuous  # noqa: E402
+from tournament import classify, sample_actions  # noqa: E402
 
 NEAR_GRASS = 64.0
-
-# add_walls settings without a counterpart here, with the only values the
-# milestone world (and so this environment) allows.
-ADD_WALLS_ONLY = {
-    "reward_scale": 1.0,
-    "prey_reward": 0,
-    "prey_punishment": 0,
-    "predator_reward": 0,
-    "predator_shaping": 0.0,
-    "obs_stack": 1,
-    "target_speed_actions": True,
-    "grass_food_reward": 0.0,
-    "grass_predators_observe": True,
-    "walls_layout": None,
-    "energy_predator_acceleration_cost": 0.0,
-    "energy_prey_acceleration_cost": 0.0,
-}
-IGNORED = {
-    "render_mode", "render_window_size", "shaping_gamma", "predator_max_age",
-    "walls_thickness", "walls_rectangles", "walls_occlusion", "walls_rays",
-    "walls_visibility_cell",
-}
-
-
-def env_config(checkpoint):
-    """The checkpoint's env_config, translated from add_walls if needed."""
-    with open(Path(checkpoint) / "class_and_ctor_args.pkl", "rb") as f:
-        saved = pickle.load(f)
-    config = dict(saved["ctor_args_and_kwargs"][0][0]["env_config"])
-    for key, value in ADD_WALLS_ONLY.items():
-        if key in config and config.pop(key) != value:
-            raise ValueError(f"{key} must be {value!r} for this environment")
-    for key in IGNORED:
-        config.pop(key, None)
-    unknown = set(config) - set(DEFAULT_CONFIG)
-    if unknown:
-        raise ValueError(f"settings without a counterpart: {sorted(unknown)}")
-    return config
-
-
-def load_modules(checkpoint):
-    modules = {}
-    for species in SPECIES:
-        path = (Path(checkpoint) / "learner_group" / "learner" / "rl_module"
-                / f"{species}_policy")
-        module = RLModule.from_checkpoint(str(path.resolve()))
-        module.to("cpu")
-        module.eval()
-        modules[species] = module
-    return modules
-
 
 def near_grass_distance(env, position):
     patches = [p.position for p in env.grass.patches if env.grass.available(p)]
@@ -155,7 +103,7 @@ def play(env, modules, seed, stats):
 def main():
     checkpoint, episodes = sys.argv[1], int(sys.argv[2])
     torch.set_num_threads(1)
-    env = PredPreyGrassContinuous(env_config(checkpoint))
+    env = PredPreyGrassContinuous(checkpoint_env_config(checkpoint))
     modules = load_modules(checkpoint)
     stats = Counter()
     rows = [play(env, modules, seed, stats) for seed in range(episodes)]

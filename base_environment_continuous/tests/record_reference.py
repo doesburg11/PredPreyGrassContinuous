@@ -20,7 +20,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "add_walls"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from compare import random_actions  # noqa: E402
 from env_wrapper import make_env  # noqa: E402
 
 # The milestone world (runs AW-17 to AW-22), in add_walls's config keys.
@@ -88,7 +90,7 @@ MILESTONE = {
 }
 
 
-def snapshot(raw):
+def snapshot(env, raw):
     """The full simulation state, including what only future steps use."""
     animals = {
         a.id(): (a.position.x, a.position.y, a.velocity.x, a.velocity.y,
@@ -109,6 +111,8 @@ def snapshot(raw):
         "time_step": raw.time_step,
         "order": [a.id() for a in raw.all_entities],
         "active": sorted(raw.agents),
+        "agents": sorted(env.agents),
+        "births": dict(raw.reproduction.births),
     }
 
 
@@ -125,16 +129,15 @@ def record(episodes, max_decisions, first_seed, overrides=None):
             seed = first_seed + e
             rng = np.random.default_rng(seed)
             obs, infos = env.reset(seed=seed)
-            episode = {"seed": seed, "reset": ({k: as_array(v) for k, v in obs.items()}, infos, snapshot(raw)), "steps": []}
-            active = sorted(obs)
+            episode = {"seed": seed, "reset": ({k: as_array(v) for k, v in obs.items()}, infos, snapshot(env, raw)), "steps": []}
+            actions = random_actions(rng, obs)
             for _ in range(max_decisions):
-                actions = {a: int(rng.integers(48)) for a in active}
                 obs, rewards, terms, truncs, infos = env.step(actions)
                 episode["steps"].append((actions, {k: as_array(v) for k, v in obs.items()},
-                                         rewards, terms, truncs, infos, snapshot(raw)))
+                                         rewards, terms, truncs, infos, snapshot(env, raw)))
                 if terms["__all__"] or truncs["__all__"]:
                     break
-                active = sorted(a for a in obs if not (terms.get(a) or truncs.get(a)))
+                actions = random_actions(rng, obs, terms, truncs)
             out.append(episode)
     finally:
         env.close()

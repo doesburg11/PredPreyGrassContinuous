@@ -27,10 +27,20 @@ the quirks that are candidates for a later, deliberate cleanup.
   `add_walls`).
 - [`tournament.py`](tournament.py): every predator checkpoint of a run
   against every prey checkpoint (as in `add_walls`).
+- [`eval.py`](eval.py) with [`config/config_eval.py`](config/config_eval.py):
+  play a trained checkpoint (or random actions) in a window, to an mp4, or
+  without rendering.
+- [`render.py`](render.py): the pygame viewer (hunters and antelopes facing
+  their direction of movement, energy bars, grass, one predator's and one
+  prey's view cone, and the populations over the episode). It only reads
+  the state, so watching never changes an episode.
+- [`checkpoints.py`](checkpoints.py): a checkpoint's settings and policies
+  (add_walls checkpoints of the milestone world included).
 - [`analysis/final_check.py`](analysis/final_check.py): final check of a
   trained checkpoint.
-- [`tests/`](tests/): the equivalence test against `add_walls` and unit
-  tests.
+- [`assets/`](assets/): the sprites.
+- [`tests/`](tests/): equivalence and regression tests against `add_walls`,
+  and unit tests.
 
 ## Usage
 
@@ -38,12 +48,14 @@ From the repository root, with the shared Conda environment:
 
 ```
 .conda/bin/python base_environment_continuous/train.py
+.conda/bin/python base_environment_continuous/eval.py
 cd base_environment_continuous && ../.conda/bin/python tournament.py runs/<run>
 .conda/bin/python -m pytest base_environment_continuous/tests
 ```
 
-Training takes no command-line arguments: edit the config files. Runs are
-saved in `base_environment_continuous/runs/`.
+Training and evaluation take no command-line arguments: edit the config
+files. Runs are saved in `base_environment_continuous/runs/`. On a machine
+without a display, set `SDL_VIDEODRIVER=dummy` to save videos.
 
 ## How the equivalence was checked
 
@@ -55,6 +67,11 @@ saved in `base_environment_continuous/runs/`.
   about 12,500 decisions, covering births, catches, starvation, grass
   collapse, extinction, the time limit, one physics step per decision,
   population caps and exhausted ID pools.
+- `tests/test_regression.py` checks the same trajectories without
+  `add_walls` or Aquarium installed, against a SHA-256 digest of every
+  decision of `add_walls`'s results stored in
+  `tests/data/reference_digests.json` (written by `tests/make_fixture.py`).
+  `test_equivalence.py` is skipped when `add_walls` is missing.
 - Run AW-21's trained policies played the same 50 seeded episodes in both
   environments with identical results (55,298 decisions, 21,873 births,
   19,860 catches).

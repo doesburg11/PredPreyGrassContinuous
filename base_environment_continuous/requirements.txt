@@ -6,7 +6,13 @@ gymnasium==1.2.2
 numpy==2.4.6
 tensorboardX==2.6.5
 
+# Viewer and videos only (render.py, eval.py):
+pygame==2.6.1
+imageio==2.38.0
+imageio-ffmpeg==0.6.0
+
 # Tests only (`.conda/bin/python -m pytest base_environment_continuous/tests`);
-# the equivalence test also runs add_walls, so it needs add_walls's
-# requirements (marl-aquarium, pettingzoo, pygame).
+# test_equivalence.py also runs add_walls, so it needs add_walls's
+# requirements (marl-aquarium, pettingzoo); without them it is skipped and
+# test_regression.py checks the same cases.
 pytest==9.1.1
