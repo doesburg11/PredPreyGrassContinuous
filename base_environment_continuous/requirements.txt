@@ -1,0 +1,12 @@
+# Resolved, working versions in the root Conda environment:
+#   pip install "ray[rllib]==2.58.0" torch --extra-index-url https://download.pytorch.org/whl/cpu
+ray[rllib]==2.58.0
+torch==2.14.0
+gymnasium==1.2.2
+numpy==2.4.6
+tensorboardX==2.6.5
+
+# Tests only (`.conda/bin/python -m pytest base_environment_continuous/tests`);
+# the equivalence test also runs add_walls, so it needs add_walls's
+# requirements (marl-aquarium, pettingzoo, pygame).
+pytest==9.1.1

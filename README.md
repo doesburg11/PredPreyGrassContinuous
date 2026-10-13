@@ -45,6 +45,11 @@ trained with RLlib's new API stack (RLModule + Learner).
   observed animal shows its energy. See its
   [README](add_group_hunting/README.md), and its
   [RESULTS](add_group_hunting/RESULTS.md) for its training runs.
+- [`base_environment_continuous/`](base_environment_continuous/) — a
+  standalone environment that replaces Aquarium and `add_walls`'s patches
+  for the milestone world (no walls, the arms-race settings), reproducing
+  `add_walls` exactly. See its [README](base_environment_continuous/README.md)
+  and [SPEC](base_environment_continuous/SPEC.md).
 
 ## Grass: from static patches to moving clusters
 
