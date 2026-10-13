@@ -40,8 +40,8 @@ switch keep their letters; new runs get only an ID.
 | AW-18 | | `2026-10-12_09-08-16_686040` | AW-17 final | 2,000 | continuation of AW-17, to test whether its arms race lasts | completed |
 | AW-19 | | `2026-10-12_17-11-38_670812` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
 | AW-20 | | `2026-10-12_17-11-58_920036` | AW-15 final | 1,000 | replicate of AW-17 (new training randomness, 14 workers) | completed |
-| AW-21 | | `2026-10-12_22-13-21_309675` | scratch | 3,000 | the AW-17 world (no walls, 75% movement share, prey 6.0, 20 grass clusters) trained from scratch | running |
-| AW-22 | | `2026-10-12_22-13-41_293112` | scratch | 3,000 | replicate of AW-21 (new training randomness) | running |
+| AW-21 | | `2026-10-12_22-13-21_309675` | scratch | 3,000 | the AW-17 world (no walls, 75% movement share, prey 6.0, 20 grass clusters) trained from scratch | completed |
+| AW-22 | | `2026-10-12_22-13-41_293112` | scratch | 3,000 | replicate of AW-21 (new training randomness) | completed |
 
 Launchers: `runs/continue_walls.py` (O), `runs/no_walls_control.py` (P) and
 `runs/fixed_cost_control.py` (Q); run R is plain `train.py` with the
@@ -888,6 +888,66 @@ improved against each other, most strongly in the first two thirds. In the
 last third the prey kept improving in every replicate, the predators in two
 of three.
 
+## 25. The same world trained from scratch (runs AW-21 and AW-22)
+
+Runs AW-17 to AW-20 all started from run AW-15's trained policies, so they
+share its history. Runs AW-21 and AW-22 train the same world (no walls, 75%
+movement share, prey top speed 6.0, grass in 20 clusters of 5) from
+scratch for 3,000 iterations each, side by side on 14 simulation workers
+each, to test whether the result emerges without that history.
+
+Per episode, in blocks of 500 iterations (predator births / prey births /
+episode length in decisions):
+
+| Iterations | AW-21 | AW-22 |
+|---|---|---|
+| 1–500 | 7.7 / 56 / 152 | 10.8 / 102 / 283 |
+| 501–1000 | 10.2 / 98 / 257 | 18.9 / 217 / 590 |
+| 1001–1500 | 16.6 / 193 / 522 | 27.2 / 336 / 918 |
+| 1501–2000 | 26.1 / 329 / 899 | 29.7 / 374 / 1,023 |
+| 2001–2500 | 29.6 / 384 / 1,042 | 31.6 / 402 / 1,099 |
+| 2501–3000 | 31.0 / 395 / 1,075 | 31.5 / 402 / 1,099 |
+
+Both runs reached the state of runs AW-17 and AW-18 (about 32 / 417 /
+1,150), AW-22 by about iteration 1,500 and AW-21 about 500 iterations
+later.
+
+**Final checks after 3,000 iterations** (50 episodes):
+
+| | AW-21 | AW-22 | AW-18 (3,000 iterations via AW-15) |
+|---|---:|---:|---:|
+| Coexisting | 37 | 41 | 40 |
+| Prey extinct | 13 | 9 | 9 |
+| Predators extinct | 0 | 0 | 1 |
+| Catch risk | 3.70 | 3.45 | 3.29 |
+| Predators / prey alive on average | 11.8 / 15.6 | 11.6 / 16.1 | 11.4 / 17.1 |
+| Predators stopped | 46% | 44% | 43% |
+| Predators' time near grass | 41% | 39% | 40% |
+| Catches near grass | 44% | 44% | 46% |
+
+**Tournaments** (checkpoints every 300 iterations, 10 episodes per matchup;
+prey / predators, share of pairs in which the newer checkpoint does
+better):
+
+| Run | All | Iterations 300–900 | 1,200–1,800 | 2,100–2,990 |
+|---|---:|---:|---:|---:|
+| AW-21 | 89% / 64% | 100% / 22% | 67% / 56% | 58% / 50% |
+| AW-22 | 79% / 71% | 100% / 78% | 67% / 67% | 38% / 46% |
+
+Predator catch risk averaged over all prey rose from 2.82 to about 4.6
+(AW-21) and from 2.06 to about 4.0 (AW-22); prey catch risk averaged over
+all predators fell from 8.44 to about 2.5–2.9 (AW-21) and from 6.04 to
+about 2.8 (AW-22).
+
+**Conclusion:** the world reproduces its result without any shared
+history. Trained from scratch, both runs end in the same healthy state
+(37 and 41 of 50 coexisting), with the same behaviour as the runs started
+from AW-15 (predators stopped 44–46% of the time, about 40% of it near
+grass, 44% of catches near grass). Both species improved against each
+other over the first two thirds of training and levelled off in the last
+third, as in AW-18; in AW-21 the prey led at first while its predators
+improved little before iteration 900.
+
 ## Findings so far
 
 1. **Walls, speed actions and movement costs together make prey much easier
@@ -940,7 +1000,12 @@ of three.
    independent training runs from the same start coexist in 43, 44 and 42
    of 50 episodes (pooled 129 of 150, against 31 of 50 for the control,
    p < 0.001), with the same behaviour and both species improving in each.
-14. **With walls and the speed-dependent cost, both species keep improving**
+14. **It also emerges from scratch** (section 25): two runs trained from
+   zero in the same world reach the same state after 3,000 iterations
+   (37 and 41 of 50 coexisting, against 40 for AW-18), with the same
+   behaviour and the same pattern of mutual improvement followed by a
+   plateau.
+15. **With walls and the speed-dependent cost, both species keep improving**
    (runs N and O: 81% and 67% of tournament pairs; run P, the same without
    walls: 79% and 69%), the highest predator share of the add_walls runs,
    though predators improve much more slowly after the first few hundred
